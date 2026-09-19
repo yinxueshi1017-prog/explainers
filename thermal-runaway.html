@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thermal Runaway</title>
+<meta name="description" content="Warm a lithium cell degree by degree. For a long way nothing happens, and then one degree of ambient removes the temperature the cell was settling at — and there is nothing left to settle at.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Crect%20x%3D%226.6%22%20y%3D%222.4%22%20width%3D%222.8%22%20height%3D%221.5%22%20rx%3D%22.4%22%20fill%3D%22%23e0703a%22%2F%3E%3Crect%20x%3D%225.1%22%20y%3D%223.8%22%20width%3D%225.8%22%20height%3D%229.9%22%20rx%3D%221.3%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Crect%20x%3D%225.1%22%20y%3D%223.8%22%20width%3D%225.8%22%20height%3D%223.4%22%20rx%3D%221.3%22%20fill%3D%22%23e0703a%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. A lumped-mass
+  Semenov thermal-explosion model integrated live and drawn into SVG — no
+  canvas, no WebGL.
+
+  THE ARGUMENT: a cell that is going to run away does not look different from
+  one that is not. It sits a couple of degrees above its surroundings, which is
+  what a warm cell is supposed to do. What changes at the critical ambient is
+  not the cell's appearance and not even its temperature — it is the EXISTENCE
+  of a temperature for it to settle at. The heat it makes rises exponentially
+  with temperature; the heat its case removes rises only in proportion. Past a
+  certain ambient the two stop crossing, and a cell with nowhere to settle
+  keeps climbing.
+
+  The second claim, which is the one that kills people: the margin is small and
+  it is invisible. At the edge the cell sits about nine degrees above ambient —
+  and nine degrees above ambient is what a healthy cell under load looks like.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:   #0e1114;
+    --card:     #141a20;
+    --ink:      #cbd5dd;
+    --ink-dim:  #7d8fa0;
+    --ink-lede: #9fb0c0;
+    --rule:     #2a3138;
+    --rule-soft:#1e242a;
+    --accent:   #93a9c0;
+    --focus:    #e0864a;
+  }
+  /* Pinned dark to sit with the rest of the site. Paper is the exception:
+     print dialogs drop CSS backgrounds, which would leave pale ink on white. */
+  @media print {
+    :root {
+      --ground:#ffffff; --card:#ffffff; --ink:#1a1f24; --ink-dim:#43505c;
+      --ink-lede:#1a1f24; --rule:#8d97a1; --rule-soft:#c8ced4;
+      --accent:#1a1f24; --focus:#1a1f24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+
+  h1 { font-size: 1.02rem; font-weight: 600; letter-spacing: .075em;
+       text-transform: uppercase; margin: 0 0 .85rem; }
+  .how { color: var(--ink-lede); margin: 0 0 1.3rem; font-size: .97rem; max-width: 47rem; }
+
+  .stage { border: 1px solid var(--rule); border-radius: 3px;
+           background: var(--card); padding: .6rem .6rem .35rem; }
+  svg { display: block; width: 100%; height: auto; }
+
+  #tr-view { touch-action: none; cursor: ns-resize; border-radius: 2px; }
+  #tr-view:focus { outline: none; }
+  #tr-view:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Sized from CSS, not in user units: a 1000-unit viewBox squeezed onto a
+     375px phone turns 15 user units into about five pixels. */
+  #tr-view .lbl { font-size: 15px; }
+  #tr-view .lbl-sm { font-size: 13px; }
+  /* MEASURED, NOT GUESSED. At a 375px viewport the 1000-unit viewBox renders
+     at 0.317, so 24 units came out 9px tall — legible only just. 36 units
+     lands at about 13px, which is the smallest this should ever be. */
+  @media (max-width: 34rem) {
+    #tr-view .lbl { font-size: 40px; }
+    #tr-view .lbl-sm { font-size: 36px; }
+  }
+
+  .cap { display: flex; justify-content: space-between; gap: 1rem;
+         color: var(--ink-dim); font-size: .78rem; margin: .5rem .2rem 0; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .9rem 0 0; }
+  button {
+    font: inherit; font-size: .85rem; color: var(--ink); background: transparent;
+    border: 1px solid var(--rule); border-radius: 3px; padding: .32rem .7rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--ground);
+                                border-color: var(--ink); }
+
+  .live { color: var(--ink-lede); font-size: .95rem; margin: .9rem 0 0;
+          min-height: 5.4em; max-width: 48rem; }
+
+  h2 { font-size: .78rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+       color: var(--ink-dim); margin: 2.8rem 0 .9rem; }
+  p.body { max-width: 44rem; margin: 0 0 1rem; }
+  .note { color: var(--ink-dim); font-size: .9rem; max-width: 44rem; }
+  ul.note { padding-left: 1.1rem; }
+  ul.note li { margin-bottom: .45rem; }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--rule);
+           color: var(--ink-dim); font-size: .9rem; }
+  a { color: var(--accent); }
+
+  @media (max-width: 34rem) { .wrap { padding-top: 1.7rem; } .cap { font-size: .72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Thermal runaway — warm a cell until it has nowhere to settle</h1>
+
+  <p class="how" id="tr-how">
+    Drag upward to warm the cell's surroundings; drag down to cool them. The arrow keys do the
+    same, a step at a time. <strong>End goes straight to a hot day</strong>; Home returns to a
+    cool one. Time is compressed — what you watch in a second takes about twenty minutes in a
+    real cell. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="tr-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="cold"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="tr-how"
+         aria-label="How warm it is around the cell"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the cell, and the air around it. Right: the heat it makes against the heat its case removes.</span>
+    </div>
+
+    <svg id="tr-trace" viewBox="0 0 1000 120" role="img"
+         aria-label="A record of the cell's temperature over the last several minutes."></svg>
+    <div class="cap">
+      <span>The cell's temperature over time, most recent at the right.</span>
+      <span id="tr-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="tr-sound" aria-pressed="false">Sound</button>
+    <button id="tr-reset">Reset</button>
+  </div>
+
+  <p class="live" id="tr-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Every lithium cell makes a little heat all the time, from slow chemistry it cannot switch
+    off. How much depends on temperature, and not gently: the rate follows an exponential, so a
+    cell ten degrees warmer makes appreciably more heat than it did.
+  </p>
+  <p class="body">
+    The case removes heat in proportion to how much hotter the cell is than its surroundings.
+    Proportion against exponential is an unequal contest, but for a long way it does not matter,
+    because the two still cross. Where they cross, the cell settles: it warms until the heat
+    leaving equals the heat arriving, and then it stops. That crossing is the whole of a cell's
+    thermal safety.
+  </p>
+  <p class="body">
+    Raise the surroundings and the removal line slides right. The lower crossing — the one the
+    cell actually sits at — climbs to meet the upper one. At some ambient they touch, and past
+    it they do not meet at all. Nothing about the cell has changed. What has gone is the
+    existence of a temperature it could settle at.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>The warning margin is about nine degrees, and it looks like nothing.</strong> Right
+    at the edge, the cell sits roughly nine degrees above its surroundings — which is what a
+    healthy cell under load looks like. There is no temperature you can read off the outside
+    that distinguishes the last safe state from the first unsafe one.
+  </p>
+  <p class="body">
+    <strong>It is set by the surroundings, not by the cell.</strong> The cell is the same
+    object at every setting here. What decides its fate is the ambient it sits in and how well
+    its case is coupled to that ambient — which are pack design decisions, made long before
+    any cell is charged.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The model is standard Semenov
+      thermal-explosion theory and the built-in checks confirm it reproduces the closed-form
+      criticality condition to within a fraction of a percent — but that check is the author's
+      own, not a battery or process-safety engineer's.</li>
+    <li><strong>The kinetics are one lumped Arrhenius term</strong>, with an activation energy
+      in the reported band for electrolyte and SEI decomposition, and a pre-exponential chosen
+      so that criticality falls near eighty degrees ambient. A real cell has several reactions
+      that start at different temperatures and feed each other, so the real curve is a stack of
+      these, not one.</li>
+    <li><strong>The cell is one lump at one temperature.</strong> Real cells have internal
+      gradients, and a hot spot runs away while the average looks calm — which makes the real
+      case worse than the one drawn, not better.</li>
+    <li><strong>Nothing here models the vent itself.</strong> The run stops at the vent
+      temperature because that is where this model stops being about heat balance and starts
+      being about gas, pressure and combustion.</li>
+    <li><strong>Time is compressed about twelve hundredfold</strong>, and the real induction
+      period near the critical ambient is hours. The slowness near the edge is real, and is
+      itself a hazard: a pack can be past the point of no return long before anything shows.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE CELL, AND WHY THESE NUMBERS
+
+     An 18650-sized cell in still air. The pre-exponential is FITTED so the
+     critical ambient lands near eighty degrees, which is the band where
+     electrolyte and SEI decomposition are reported to take off. Everything
+     else is ordinary.
+     ================================================================== */
+
+  var R    = 8.314;      /* J/mol/K                                        */
+  var Ea   = 120000;     /* J/mol — within the reported band for SEI and
+                            electrolyte decomposition                      */
+  var MCP  = 45;         /* J/K — 45 g at about 1000 J/kg/K                */
+  var HS   = 0.042;      /* W/K — h*S for a bare 18650 in still air:
+                            about 10 W/m^2/K over about 42 cm^2           */
+  var TVENT = 450;       /* K. The run stops here: past the vent this stops
+                            being a heat-balance problem.                  */
+
+  /* THE FIT. Choose the cell temperature at tangency, derive the pre-
+     exponential that puts it there. Doing it this way round means the
+     closed-form criticality condition is not something the constants were
+     tuned against — the checks rediscover it numerically. */
+  var TC_FIT = 360;
+  var C = HS * (R * TC_FIT * TC_FIT / Ea) * Math.exp(Ea / (R * TC_FIT));
+
+  /* AMBIENT RANGE, CHOSEN SO THE DIAGRAM STAYS HONEST.
+
+     It started at 20 C, and at 20 C the upper crossing sits at 3.7 W while
+     the lower one — the one the cell actually occupies — is at 0.000 W. Any
+     power axis tall enough to show the first squashes the second onto the
+     baseline, and the markers ended up clamped to the edges of the plot,
+     drawing crossings where the model has none.
+
+     From 50 C the two crossings stay inside one frame across the whole
+     range, and criticality at 77.9 C falls about three fifths of the way
+     along the control — far enough in that the long uneventful stretch is
+     still the first thing you meet. */
+  var TA_MIN = 323.15, TA_MAX = 368.15;
+
+  /* Time compression. Real induction near the edge is hours; at 1200x a
+     second of watching is about twenty minutes of cell. Disclosed in the
+     instruction line and again in the honesty section, because a reader who
+     thinks this happens in seconds has been told something false.
+
+     TUNED AGAINST THE CLOCK, not by feel. At 600x, watching a cell settle
+     below criticality took nineteen seconds — too long to spend on the half
+     of the story where nothing happens. At 1200x it settles in ten and vents
+     in two, while an ambient barely past the edge still takes fifteen. The
+     slowness near the edge survives the change deliberately: that slowness
+     is one of the things the piece is about. */
+  var ACCEL = 1200;
+
+  function qGen(T) { return C * Math.exp(-Ea / (R * T)); }
+  function qRem(T, Ta) { return HS * (T - Ta); }
+
+  /* ==================================================================
+     2. THE STEADY STATES
+
+     Where generation and removal cross. Below the critical ambient there
+     are two: a stable one low down that the cell sits at, and an unstable
+     one above it that is the point of no return. They approach each other
+     as the ambient rises and annihilate at tangency — which is the entire
+     mechanism, and the reason the picture is worth drawing.
+     ================================================================== */
+
+  function roots(Ta) {
+    var out = [], T = 290, prev = qGen(290) - qRem(290, Ta), Tp = 290, step = 0.05;
+    while (T < 440) {
+      T += step;
+      var cur = qGen(T) - qRem(T, Ta);
+      if ((prev < 0) !== (cur < 0)) {
+        var lo = Tp, hi = T, m, i;
+        for (i = 0; i < 60; i++) {
+          m = 0.5 * (lo + hi);
+          if ((qGen(lo) - qRem(lo, Ta) < 0) !== (qGen(m) - qRem(m, Ta) < 0)) hi = m; else lo = m;
+        }
+        out.push(0.5 * (lo + hi));
+      }
+      prev = cur; Tp = T;
+    }
+    return out;
+  }
+
+  /* The largest ambient that still has anywhere to settle. Found by
+     bisection on "does a crossing exist", so it is a property of the model
+     rather than a number written down. */
+  function criticalAmbient() {
+    var lo = 290, hi = 400, m, i;
+    for (i = 0; i < 60; i++) {
+      m = 0.5 * (lo + hi);
+      if (roots(m).length) lo = m; else hi = m;
+    }
+    return lo;
+  }
+  var TA_CRIT = criticalAmbient();
+
+  /* ==================================================================
+     3. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('tr-view');
+  var trace = document.getElementById('tr-trace');
+
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  /* left panel — the cell in its surroundings */
+  var BOX_X = 36, BOX_W = 360, BOX_Y = 44, BOX_H = 356;
+  var CELL_X = 176, CELL_W = 80, CELL_Y = 120, CELL_H = 216;
+
+  /* right panel — the balance diagram */
+  var GX0 = 500, GX1 = 962, GY0 = 62, GY1 = 372;
+  var T_LO = 313.15, T_HI = 388.15;  /* x axis: 40 C to 115 C              */
+  var P_HI = 2.4;                    /* y axis, watts. The tallest upper
+                                        crossing in range is 2.25 W at the
+                                        coolest ambient, so everything the
+                                        model has fits inside the frame.    */
+
+  function gx(T) { return GX0 + (GX1 - GX0) * (T - T_LO) / (T_HI - T_LO); }
+  function gy(P) { return GY1 - (GY1 - GY0) * Math.min(P, P_HI) / P_HI; }
+
+  /* ONE SATURATED COLOUR PER PANEL.
+
+     Left: the cell's own heat, and it arrives far too late to be a warning —
+     which is the argument. The cell stays in a desaturated grey the whole
+     way up and only takes colour when it is already past saving.
+
+     Right: the generation curve. It is the thing that wins, so it is the
+     only saturated stroke on the diagram; removal is drawn in the same cool
+     steel as everything else. */
+  var COOL = [122, 146, 168];
+  var WARM = [196, 168, 140];
+  var HOT  = [226,  78,  38];
+
+  function mix(a, b, t) {
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+                    Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+                    Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  /* Deliberately flat until very late: from ambient up to the unstable root
+     the cell should look like a warm cell and nothing more. */
+  function cellColour(T) {
+    var t = (T - 290) / (TVENT - 290);
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    if (t < 0.45) return mix(COOL, WARM, t / 0.45 * 0.55);
+    return mix(mix(COOL, WARM, 0.55).match(/\d+/g).map(Number), HOT, (t - 0.45) / 0.55);
+  }
+
+  /* -- surroundings ------------------------------------------------- */
+  var box = el('rect', { x: BOX_X, y: BOX_Y, width: BOX_W, height: BOX_H, rx: 4,
+                         fill: 'rgb(26,32,38)', stroke: 'currentColor',
+                         'stroke-width': 1, 'stroke-opacity': '.35' });
+  el('text', { x: BOX_X + 12, y: BOX_Y + 24, 'class': 'lbl-sm',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'the air around it';
+
+  /* -- the cell ------------------------------------------------------ */
+  el('rect', { x: CELL_X + 27, y: CELL_Y - 13, width: 26, height: 14, rx: 3,
+               fill: 'rgb(150,160,170)' });
+  var cell = el('rect', { x: CELL_X, y: CELL_Y, width: CELL_W, height: CELL_H, rx: 9,
+                          fill: 'rgb(122,146,168)' });
+  el('rect', { x: CELL_X, y: CELL_Y, width: CELL_W, height: CELL_H, rx: 9,
+               fill: 'none', stroke: 'currentColor', 'stroke-width': 1.2, opacity: '.4' });
+  /* the vent burst — hidden until there is one */
+  var vent = el('path', { d: '', fill: 'rgb(226,78,38)', opacity: '0' });
+  el('text', { x: CELL_X + CELL_W / 2, y: CELL_Y + CELL_H + 30, 'class': 'lbl-sm',
+               'text-anchor': 'middle', fill: 'currentColor',
+               opacity: '.55' }).textContent = 'the cell';
+
+  /* -- the balance diagram ------------------------------------------- */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  /* INSIDE the plot, above the axis. Below it, this shared a band with the
+     marker label that tracks the cell, and at the phone label size the two
+     were one line apart — which is no separation at all. */
+  el('text', { x: GX1, y: GY1 - 12, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.6' }).textContent = 'how hot the cell is →';
+  el('text', { x: GX0 - 8, y: GY0 + 2, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.6' }).textContent = 'heat';
+
+  var genPath = el('path', { d: '', fill: 'none', stroke: 'rgb(226,78,38)',
+                             'stroke-width': 2.6, 'stroke-linejoin': 'round' });
+  var remLine = el('line', { stroke: 'rgb(150,172,190)', 'stroke-width': 2.2 });
+  el('text', { x: GX1, y: GY0 + 16, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'rgb(226,78,38)', opacity: '.95' }).textContent = 'heat the cell makes';
+  var remLbl = el('text', { 'class': 'lbl-sm', fill: 'rgb(150,172,190)', opacity: '.95',
+                            'text-anchor': 'end' });
+  remLbl.textContent = 'heat the case removes';
+
+  /* the two crossings, and where the cell actually is */
+  var rootLo = el('circle', { r: 5.5, fill: 'rgb(150,172,190)', opacity: '0' });
+  var rootHi = el('circle', { r: 5.5, fill: 'none', stroke: 'rgb(226,78,38)',
+                              'stroke-width': 2, opacity: '0' });
+  var nowMark = el('path', { d: '', fill: 'currentColor', opacity: '.85' });
+  var nowLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
+                            fill: 'currentColor', opacity: '.7' });
+  nowLbl.textContent = 'the cell';
+
+  /* -- the trace ------------------------------------------------------ */
+  var TSPAN = 22;                    /* seconds of wall clock on screen    */
+  var tracePts = el('polyline', { fill: 'none', stroke: 'rgb(190,205,218)',
+                                  'stroke-width': 2 }, trace);
+  var ambPts = el('polyline', { fill: 'none', stroke: 'currentColor', 'stroke-width': 1.4,
+                                opacity: '.4', 'stroke-dasharray': '3 4' }, trace);
+
+  function ty(T) {
+    var t = (T - 290) / (TVENT - 290);
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    return 120 - t * 116;
+  }
+
+  /* ==================================================================
+     4. STATE
+     ================================================================== */
+
+  var Ta = TA_MIN, T = TA_MIN;
+  var simT = 0, hist = [];
+  var vented = false, ventAt = -1;
+
+  var reduce = false;
+  try {
+    reduce = window.matchMedia &&
+             window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) { reduce = false; }
+  /* A branch that cannot be opened cannot be checked. */
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  function reset() {
+    Ta = TA_MIN; T = TA_MIN; simT = 0; hist = []; vented = false; ventAt = -1;
+    saidKey = null;
+    say('cold');
+    render();
+  }
+
+  /* ==================================================================
+     5. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    cold: 'Cool and idle. The cell is making a little heat, as every cell always is, and ' +
+          'its case is carrying that away without having to try. The two curves cross low ' +
+          'down, and where they cross is where the cell sits.',
+    warm: 'Warmer. The cell has settled a degree or two above its surroundings and stopped ' +
+          'there — which is exactly what a healthy cell does. Nothing about it is in trouble.',
+    close: 'The two crossings are closing on each other. The cell is sitting further above ' +
+           'its surroundings than before, and it is taking longer to get there. Nothing you ' +
+           'could see on the outside separates this from the state before it.',
+    past: 'No crossing left. Above this ambient there is no temperature at which the case ' +
+          'can remove the heat the cell is making — so there is nothing for the cell to ' +
+          'settle at, and it does not settle. Notice how little it is doing, for how long.',
+    running: 'Still climbing. Every degree it gains makes it produce more heat than the ' +
+             'degree before, and the case is falling further behind with each one.',
+    vented: 'Vented. Look back at the trace: almost all of that was a cell sitting quietly, ' +
+            'slightly warm, looking like a cell that was fine. The part that looks like an ' +
+            'emergency is the last sliver of it.',
+    cooling: 'Cooler again. A crossing exists once more, and the cell settles back down to ' +
+             'it — provided it had not already gone past the upper crossing, which is the ' +
+             'point after which cooling the room no longer helps.'
+  };
+
+  var live = document.getElementById('tr-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     6. SOUND — opt in, built only after a gesture
+
+     A cell gives almost nothing away before it vents, so neither does this.
+     There is a faint rising hiss once it is genuinely climbing, and then the
+     vent. Silence for most of the run is the honest sound design.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, hissNode = null, hissGain = null;
+
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var len = Math.floor(audio.sampleRate * 2);
+      var buf = audio.createBuffer(1, len, audio.sampleRate);
+      var ch = buf.getChannelData(0), i;
+      for (i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * 0.5;
+      hissNode = audio.createBufferSource();
+      hissNode.buffer = buf; hissNode.loop = true;
+      var bp = audio.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.7;
+      hissGain = audio.createGain(); hissGain.gain.value = 0;
+      hissNode.connect(bp); bp.connect(hissGain); hissGain.connect(audio.destination);
+      hissNode.start();
+    } catch (e) { audio = null; }
+  }
+
+  function setHiss(v) {
+    if (!hissGain || !audio) return;
+    hissGain.gain.setTargetAtTime(soundOn ? v * 0.09 : 0, audio.currentTime, 0.25);
+  }
+
+  function ventSound() {
+    if (!audio || !soundOn) return;
+    var dur = 0.9, sr = audio.sampleRate;
+    var b = audio.createBuffer(1, Math.floor(sr * dur), sr), d = b.getChannelData(0), i;
+    for (i = 0; i < d.length; i++) {
+      var t = i / sr;
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 4.5) * (t < 0.02 ? t / 0.02 : 1);
+    }
+    var s = audio.createBufferSource(); s.buffer = b;
+    var hp = audio.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
+    var g = audio.createGain(); g.gain.value = 0.5;
+    s.connect(hp); hp.connect(g); g.connect(audio.destination);
+    s.start();
+  }
+
+  /* ==================================================================
+     7. RENDER
+     ================================================================== */
+
+  var lastRoots = [];
+
+  function render() {
+    var i;
+
+    /* surroundings and cell */
+    var at = (Ta - TA_MIN) / (TA_MAX - TA_MIN);
+    box.setAttribute('fill', mix([22, 27, 33], [58, 40, 34], at));
+    cell.setAttribute('fill', cellColour(T));
+
+    if (vented) {
+      vent.setAttribute('d',
+        'M' + (CELL_X + 40) + ' ' + (CELL_Y - 14) +
+        ' l-30 -30 l16 4 l-8 -34 l22 26 l8 -30 l10 34 l18 -14 l-8 30 l22 -6 Z');
+      vent.setAttribute('opacity', '0.95');
+    } else {
+      vent.setAttribute('opacity', '0');
+    }
+
+    /* generation curve, clipped at the top of the axis */
+    var d = '', started = false;
+    for (i = 0; i <= 200; i++) {
+      var Tx = T_LO + (T_HI - T_LO) * (i / 200);
+      var P = qGen(Tx);
+      if (P > P_HI * 1.02) { if (started) { d += ' L' + gx(Tx).toFixed(1) + ' ' + gy(P_HI * 1.02); } break; }
+      d += (started ? ' L' : 'M') + gx(Tx).toFixed(1) + ' ' + gy(P).toFixed(1);
+      started = true;
+    }
+    genPath.setAttribute('d', d);
+
+    /* removal line */
+    var pEnd = qRem(T_HI, Ta);
+    remLine.setAttribute('x1', gx(Ta)); remLine.setAttribute('y1', gy(0));
+    remLine.setAttribute('x2', gx(Math.min(T_HI, Ta + P_HI / HS)));
+    remLine.setAttribute('y2', gy(Math.min(pEnd, P_HI)));
+    remLbl.setAttribute('x', GX1);
+    /* KEPT CLEAR OF THE CURVE'S OWN LABEL. The generation label sits at
+       GY0+16; at the phone label size (36 units) a 34-unit gap is less than
+       one line of text, and the two collided. Measured at 375px. */
+    remLbl.setAttribute('y', Math.max(GY0 + 82, gy(Math.min(pEnd, P_HI)) - 12));
+
+    /* the crossings */
+    var rs = roots(Ta); lastRoots = rs;
+    /* A MARKER IS AN ASSERTION THAT A CROSSING IS THERE. gy() clamps, so a
+       crossing above the top of the axis would be drawn sitting ON the top
+       of the axis — a crossing the model does not have, at a power it never
+       reaches. Off-plot crossings are hidden, not clamped. */
+    function place(node, T) {
+      if (T === null) { node.setAttribute('opacity', '0'); return; }
+      var P = qRem(T, Ta);
+      if (T < T_LO || T > T_HI || P > P_HI) { node.setAttribute('opacity', '0'); return; }
+      node.setAttribute('cx', gx(T)); node.setAttribute('cy', gy(P));
+      node.setAttribute('opacity', '0.95');
+    }
+    place(rootLo, rs.length >= 1 ? rs[0] : null);
+    place(rootHi, rs.length >= 2 ? rs[1] : null);
+
+    /* where the cell actually is, on the temperature axis */
+    var off = T > T_HI;
+    var x = gx(Math.min(T, T_HI));
+    nowMark.setAttribute('d', 'M' + x + ' ' + (GY1 + 3) + ' l-6 11 l12 0 Z');
+    nowMark.setAttribute('opacity', off ? '.45' : '.85');
+    /* Past the right-hand edge the marker cannot keep up. It stops, and the
+       label stops claiming to be where the cell is. */
+    /* ON ITS OWN LINE, BELOW THE AXIS LABEL. Sharing a line with
+       "how hot the cell is" collided as soon as the marker rode to the right
+       edge. And when it is off-scale the text is longer, so it is anchored to
+       the right edge rather than centred on a marker that would push it past
+       the edge of the drawing. */
+    nowLbl.textContent = off ? 'the cell is past this edge' : 'the cell';
+    nowLbl.setAttribute('text-anchor', off ? 'end' : 'middle');
+    nowLbl.setAttribute('x', off ? GX1 : x);
+    nowLbl.setAttribute('y', GY1 + 34);
+
+    /* the trace */
+    if (hist.length > 1) {
+      var t0 = Math.max(0, simT - TSPAN * ACCEL), span = TSPAN * ACCEL;
+      var a = [], b = [], stride = Math.max(1, Math.floor(hist.length / 500));
+      for (i = 0; i < hist.length; i += stride) {
+        var p = hist[i];
+        if (p[0] < t0) continue;
+        var px = (((p[0] - t0) / span) * 1000).toFixed(1);
+        a.push(px + ',' + ty(p[1]).toFixed(1));
+        b.push(px + ',' + ty(p[2]).toFixed(1));
+      }
+      tracePts.setAttribute('points', a.join(' '));
+      ambPts.setAttribute('points', b.join(' '));
+      document.getElementById('tr-cmp').textContent = 'Dashed: the surroundings.';
+    } else {
+      tracePts.setAttribute('points', ''); ambPts.setAttribute('points', '');
+    }
+
+    /* the control's value, in words and never in digits */
+    var pct = Math.round(at * 100);
+    view.setAttribute('aria-valuenow', pct);
+    view.setAttribute('aria-valuetext',
+      vented ? 'the cell has vented' :
+      rs.length === 0 ? 'too warm for the cell to settle anywhere' :
+      at < 0.2 ? 'cool' : at < 0.55 ? 'warm' : at < 0.8 ? 'hot' : 'very hot');
+  }
+
+  /* ==================================================================
+     8. THE LOOP
+     ================================================================== */
+
+  var last = 0, carry = 0;
+  var DT = 0.5;                       /* seconds of cell time per solver step */
+
+  function advance(dtReal) {
+    if (vented) return;
+    if (dtReal > 0.25) dtReal = 0.25;
+    carry += dtReal * ACCEL;
+    var steps = Math.floor(carry / DT);
+    if (steps > 4000) steps = 4000;
+    carry -= steps * DT;
+    /* The debt is DROPPED, not banked: capping the steps while keeping the
+       remainder leaves the simulation falling permanently further behind. */
+    if (carry > DT * 4000) carry = 0;
+
+    for (var s = 0; s < steps; s++) {
+      T += (qGen(T) - qRem(T, Ta)) / MCP * DT;
+      if (T < 200) T = 200;
+      simT += DT;
+      if (s % 20 === 0 || s === steps - 1) {
+        hist.push([simT, T, Ta]);
+        if (hist.length > 3000) hist.splice(0, hist.length - 3000);
+      }
+      if (T >= TVENT) { T = TVENT; vented = true; ventAt = simT; ventSound(); setHiss(0); break; }
+    }
+
+    /* narration */
+    if (vented) say('vented');
+    else {
+      var rs = lastRoots.length ? lastRoots : roots(Ta);
+      var rate = (qGen(T) - qRem(T, Ta)) / MCP;      /* K per second of cell time */
+      if (rs.length === 0) say(rate > 0.0025 ? 'running' : 'past');
+      else if (rs.length >= 2 && T > rs[1]) say('running');
+      else if (Ta > TA_CRIT - 6) say('close');
+      else if (Ta > TA_MIN + 18) say('warm');
+      else say('cold');
+      setHiss(Math.max(0, Math.min(1, (T - 330) / 100)));
+    }
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    var dt = (now - last) / 1000; last = now;
+    advance(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     9. REDUCED MOTION — the payoff without the motion
+
+     The whole run is solved in one synchronous pass and the result drawn
+     static: the trace shows the entire history, the diagram shows the
+     balance at this ambient, and the cell shows the state it ended in.
+     Nothing animates. The payoff — a cell that vents — is fully reachable.
+     ================================================================== */
+
+  function solveStatic() {
+    T = Ta; simT = 0; hist = []; vented = false;
+    var horizon = 6 * 3600, t = 0;
+    while (t < horizon) {
+      T += (qGen(T) - qRem(T, Ta)) / MCP * DT; t += DT; simT = t;
+      if (t % 10 < DT) hist.push([t, T, Ta]);
+      if (T >= TVENT) { T = TVENT; vented = true; break; }
+      /* settled: stop early so the trace is not mostly a flat line */
+      if (t > 1800 && Math.abs((qGen(T) - qRem(T, Ta)) / MCP) < 1e-6) break;
+    }
+    /* show the whole run, whatever its length */
+    TSPAN = Math.max(1, simT / ACCEL);
+  }
+
+  function reducedUpdate() {
+    solveStatic();
+    render();
+    saidKey = null;
+    live.textContent = (vented ? SAY.vented : (roots(Ta).length ? SAY.warm : SAY.past)) +
+      ' Motion is reduced here, so the whole run is solved at once and drawn as it ended, ' +
+      'rather than played.';
+  }
+
+  /* ==================================================================
+     10. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, a0 = 0;
+  var TRAVEL = 300;
+
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setAmb(a) {
+    if (a < 0) a = 0; if (a > 1) a = 1;
+    Ta = TA_MIN + (TA_MAX - TA_MIN) * a;
+    if (vented) { vented = false; T = Ta; hist = []; simT = 0; }
+    if (reduce) reducedUpdate();
+  }
+
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); a0 = (Ta - TA_MIN) / (TA_MAX - TA_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setAmb(a0 - (localY(ev) - y0) / TRAVEL);      /* up = warmer */
+    ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, a = (Ta - TA_MIN) / (TA_MAX - TA_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setAmb(a + 0.04);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setAmb(a - 0.04);
+    else if (k === 'PageUp') setAmb(a + 0.15);
+    else if (k === 'PageDown') setAmb(a - 0.15);
+    else if (k === 'End') setAmb(1);
+    else if (k === 'Home') setAmb(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+
+  document.getElementById('tr-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    if (!soundOn) setHiss(0);
+  });
+  document.getElementById('tr-reset').addEventListener('click', function () {
+    reset(); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     11. THE CHECKS
+
+     Closed-form results the model must reproduce, run on load against the
+     same functions the picture uses. #dev prints them; a failure warns to
+     the console either way.
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toFixed(3) +
+               (unit || ' K') + ', expected ' + want.toFixed(3) + ' ± ' + tol.toFixed(3));
+    }
+
+    /* 1. THE TANGENCY IDENTITY. At criticality the cell sits exactly
+          R*Tc^2/Ea above ambient. This is the quantity the theory names,
+          so it is the quantity measured — not the peak, not the settled
+          temperature at some nearby ambient. */
+    var rc = roots(TA_CRIT);
+    var Tc = rc[0];
+    chk('cell above ambient at criticality', Tc - TA_CRIT, R * Tc * Tc / Ea, 0.05);
+
+    /* 2. Two steady states below criticality, none above. */
+    var below = roots(TA_CRIT - 8).length, above = roots(TA_CRIT + 0.5).length;
+    if (below === 2 && above === 0) out.push('PASS  two crossings below, none above');
+    else { ok = false; out.push('FAIL  crossings: ' + below + ' below, ' + above + ' above'); }
+
+    /* 3. They merge as the ambient rises. */
+    var sepFar = roots(TA_CRIT - 10), sepNear = roots(TA_CRIT - 1);
+    var dFar = sepFar[1] - sepFar[0], dNear = sepNear[1] - sepNear[0];
+    if (dNear < dFar) out.push('PASS  crossings merge  ' + dFar.toFixed(1) + ' K -> ' + dNear.toFixed(1) + ' K');
+    else { ok = false; out.push('FAIL  crossings did not merge'); }
+
+    /* 4. Integrated from ambient, the cell lands on the LOWER crossing —
+          the stable one. Getting the upper one would mean the model had
+          the stability the wrong way round. */
+    var Ta1 = TA_CRIT - 8, r1 = roots(Ta1), Tt = Ta1, i;
+    for (i = 0; i < 200000; i++) Tt += (qGen(Tt) - qRem(Tt, Ta1)) / MCP * DT;
+    chk('settles on the lower crossing', Tt, r1[0], 0.2);
+
+    /* 5. One step past criticality it reaches the vent. */
+    var Ta2 = TA_CRIT + 1, T2 = Ta2, hit = false;
+    for (i = 0; i < 400000 && !hit; i++) {
+      T2 += (qGen(T2) - qRem(T2, Ta2)) / MCP * DT;
+      if (T2 >= TVENT) hit = true;
+    }
+    if (hit) out.push('PASS  one degree past criticality reaches the vent');
+    else { ok = false; out.push('FAIL  no runaway past criticality'); }
+
+    /* 6. NEGATIVE CONTROL. Take the temperature dependence out of the
+          generation term and the whole phenomenon should disappear: with
+          generation constant, a crossing exists at every ambient and there
+          is no criticality for check 1 to find. An instrument that cannot
+          fail is not evidence. */
+    var realQGen = qGen;
+    qGen = function () { return C * Math.exp(-Ea / (R * 340)); };
+    var flatCrit = (function () {
+      var lo = 290, hi = 400, m, j;
+      for (j = 0; j < 60; j++) { m = 0.5 * (lo + hi); if (roots(m).length) lo = m; else hi = m; }
+      return lo;
+    })();
+    qGen = realQGen;
+    var caught = flatCrit > 399;   /* no criticality inside the search range */
+    if (caught) out.push('PASS  negative control: constant generation has no criticality');
+    else { ok = false; out.push('FAIL  negative control found criticality at ' + flatCrit.toFixed(1)); }
+
+    out.push('      (critical ambient ' + (TA_CRIT - 273.15).toFixed(1) +
+             ' C, cell at tangency ' + (Tc - 273.15).toFixed(1) + ' C)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     12. GO
+     ================================================================== */
+
+  reset();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('thermal-runaway: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate();
+  else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
