@@ -277,6 +277,20 @@ for p in pages:
     check(re.search(r"reduce\\b.*test\(location\.hash|location\.hash.*reduce", src[p]) is not None,
           "%s: its reduced-motion branch can be opened with #reduce" % p)
 
+print("\nFOCUS  (removing an outline without replacing it is the classic way to lose it)")
+# Every drawing sets outline:none so the browser's default ring does not sit
+# around a 1000-unit SVG. That is only acceptable paired with a :focus-visible
+# replacement, and the replacement is what a keyboard reader steers by.
+# The replacement has to belong to the SAME selector that removed it. An
+# earlier version of this check only asked whether the file contained a
+# :focus-visible rule anywhere — and every piece has two, one for the drawing
+# and one for the buttons, so deleting the drawing's ring left the check
+# passing. The negative control caught that, which is what it is for.
+for p in pages:
+    for sel in re.findall(r"(#[a-z-]+):focus\s*\{[^}]*outline:\s*none", src[p]):
+        check(re.search(r"%s:focus-visible\s*\{[^}]*outline:\s*2px" % re.escape(sel), src[p]) is not None,
+              "%s: %s replaces the ring it removes" % (p, sel))
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
