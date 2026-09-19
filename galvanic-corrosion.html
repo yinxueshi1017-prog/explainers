@@ -526,15 +526,15 @@
         ' ' + xe.toFixed(1) + ' ' + (PL_TOP + lost - 2).toFixed(1));
       arrows[i].setAttribute('opacity', holed ? '0.25' : '0.75');
     }
-    /* Was '.35' once the plate was holed — a deliberate "this no longer
-       applies" fade that measured 1.7:1, which is not dim, it is gone. A
-       single-frame contrast check never saw it because it only happens in
-       one state. De-emphasis now stays inside legibility. */
-    /* Once holed this used to fade to '.35' — 1.7:1, which is not dim, it is
-       gone; then '.62', still only 2.8:1. On a saturated colour against this
-       card, opacity cannot express de-emphasis and stay legible: below about
-       .90 it falls under WCAG's 4.5 for text. So the fade is now token, and
-       the "this is no longer the point" job belongs to the narration. */
+    /* Once the plate was holed this faded to '.35', to say the corrosion
+       current is no longer the point. That measures 1.7:1 against this card
+       — not dim, gone. '.62' was still only 2.8:1. Against this ground a
+       saturated colour has about .90 of range before text drops under
+       WCAG's 4.5, which is not enough to express anything, so the fade is
+       now token and the narration does that job instead.
+
+       Neither value was ever visible to a single-frame contrast check: the
+       faded state only exists once the plate is holed. */
     curLbl.setAttribute('opacity', holed ? '.9' : '1');
 
     /* the trace */
