@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galvanic Corrosion</title>
+<meta name="description" content="Two metals in seawater. Change nothing but the proportions and the same couple goes from lasting longer than the structure to perforating in three weeks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Crect%20x%3D%222.2%22%20y%3D%226.6%22%20width%3D%223.4%22%20height%3D%223.6%22%20rx%3D%22.5%22%20fill%3D%22%23e0703a%22%2F%3E%3Crect%20x%3D%225.8%22%20y%3D%226.6%22%20width%3D%228%22%20height%3D%223.6%22%20rx%3D%22.5%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Cpath%20d%3D%22M11%205.4%20Q8%202.6%204%205.2%22%20fill%3D%22none%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.1%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. An
+  oxygen-limited galvanic couple integrated live and drawn into SVG — no
+  canvas, no WebGL.
+
+  THE ARGUMENT: the question people ask is "can I put these two metals
+  together", and it is the wrong question. What sets the damage is the RATIO
+  of their wetted areas. In aerated seawater the cathode can only pass the
+  current that oxygen can diffuse to it, so the whole couple current is fixed
+  by how much cathode there is — and every bit of that current has to leave
+  through the anode, however small the anode happens to be.
+
+  So the anodic current density, which is what actually eats through a plate,
+  is the cathode-to-anode area ratio times a constant. Same two metals, same
+  water: a large anode lasts longer than the structure, and a small one
+  perforates in weeks. Nothing about the materials changed.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:   #0e1114;
+    --card:     #141a20;
+    --ink:      #cbd5dd;
+    --ink-dim:  #7d8fa0;
+    --ink-lede: #9fb0c0;
+    --rule:     #2a3138;
+    --rule-soft:#1e242a;
+    --accent:   #93a9c0;
+    --focus:    #e0864a;
+  }
+  @media print {
+    :root {
+      --ground:#ffffff; --card:#ffffff; --ink:#1a1f24; --ink-dim:#43505c;
+      --ink-lede:#1a1f24; --rule:#8d97a1; --rule-soft:#c8ced4;
+      --accent:#1a1f24; --focus:#1a1f24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+
+  h1 { font-size: 1.02rem; font-weight: 600; letter-spacing: .075em;
+       text-transform: uppercase; margin: 0 0 .85rem; }
+  .how { color: var(--ink-lede); margin: 0 0 1.3rem; font-size: .97rem; max-width: 47rem; }
+
+  .stage { border: 1px solid var(--rule); border-radius: 3px;
+           background: var(--card); padding: .6rem .6rem .35rem; }
+  svg { display: block; width: 100%; height: auto; }
+
+  #gc-view { touch-action: none; cursor: ns-resize; border-radius: 2px; }
+  #gc-view:focus { outline: none; }
+  #gc-view:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Measured, not guessed: a 1000-unit viewBox at a 375px viewport renders at
+     about 0.32, so anything under ~36 units is unreadable on a phone. */
+  #gc-view .lbl { font-size: 15px; }
+  #gc-view .lbl-sm { font-size: 13px; }
+  @media (max-width: 34rem) {
+    #gc-view .lbl { font-size: 40px; }
+    #gc-view .lbl-sm { font-size: 36px; }
+  }
+
+  .cap { display: flex; justify-content: space-between; gap: 1rem;
+         color: var(--ink-dim); font-size: .78rem; margin: .5rem .2rem 0; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .9rem 0 0; }
+  button {
+    font: inherit; font-size: .85rem; color: var(--ink); background: transparent;
+    border: 1px solid var(--rule); border-radius: 3px; padding: .32rem .7rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--ground);
+                                border-color: var(--ink); }
+
+  .live { color: var(--ink-lede); font-size: .95rem; margin: .9rem 0 0;
+          min-height: 5.4em; max-width: 48rem; }
+
+  h2 { font-size: .78rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+       color: var(--ink-dim); margin: 2.8rem 0 .9rem; }
+  p.body { max-width: 44rem; margin: 0 0 1rem; }
+  .note { color: var(--ink-dim); font-size: .9rem; max-width: 44rem; }
+  ul.note { padding-left: 1.1rem; }
+  ul.note li { margin-bottom: .45rem; }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--rule);
+           color: var(--ink-dim); font-size: .9rem; }
+  a { color: var(--accent); }
+
+  @media (max-width: 34rem) { .wrap { padding-top: 1.7rem; } .cap { font-size: .72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Galvanic corrosion — the same two metals, in different proportions</h1>
+
+  <p class="how" id="gc-how">
+    Drag upward to give the stainless more of the wetted area and the aluminium less; drag
+    down for the reverse. The arrow keys do the same, a step at a time.
+    <strong>End goes straight to the worst case</strong>; Home to the mildest. Nothing else
+    changes — not the metals, not the water. Time is compressed. Sound is off until you turn
+    it on.
+  </p>
+
+  <div class="stage">
+    <svg id="gc-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="mostly aluminium"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="gc-how"
+         aria-label="How the wetted area is divided between the two metals"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>A section through the joint, under water. The arrows are the corrosion current.</span>
+    </div>
+
+    <svg id="gc-trace" viewBox="0 0 1000 120" role="img"
+         aria-label="How deep the attack on the aluminium has got, over time."></svg>
+    <div class="cap">
+      <span>Depth of attack on the aluminium over time.</span>
+      <span id="gc-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="gc-sound" aria-pressed="false">Sound</button>
+    <button id="gc-reset">Reset</button>
+  </div>
+
+  <p class="live" id="gc-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Two metals in contact in seawater make a battery. The less noble one — here the
+    aluminium — gives up electrons and dissolves; the more noble one, the stainless, does
+    not corrode but provides somewhere for those electrons to go, by reducing dissolved
+    oxygen at its surface.
+  </p>
+  <p class="body">
+    That reaction is limited by how fast oxygen can reach the metal, so each square
+    centimetre of stainless can only pass so much current. The total current the couple
+    runs is therefore set by <em>how much stainless is wetted</em> — and nothing else.
+  </p>
+  <p class="body">
+    All of that current has to come out of the aluminium. If the aluminium is large, the
+    current is spread thinly over it and each part loses very little. If the aluminium is
+    small, exactly the same current is concentrated into that small area, and it is eaten
+    through quickly. Halve the anode and you double the rate; the damage follows the
+    <strong>ratio</strong> of the two areas, not the identity of the metals.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>A small anode is the dangerous arrangement.</strong> An aluminium rivet in a
+    stainless plate is a different object from a stainless rivet in an aluminium plate, even
+    though a materials list would describe them identically. The first concentrates the whole
+    couple current into the rivet.
+  </p>
+  <p class="body">
+    <strong>This is why a coating on the anode can be worse than no coating at all.</strong>
+    Paint the aluminium and leave a scratch, and you have not reduced the driving force —
+    you have reduced the anode to the size of the scratch. The same current now leaves
+    through a pinhole. Coat the cathode instead and the couple current falls with it.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The model is the standard
+      oxygen-limited galvanic couple and the built-in checks confirm it reproduces the
+      closed-form area-ratio law exactly — but that check is the author's own, not a
+      corrosion engineer's.</li>
+    <li><strong>The cathode is assumed fully oxygen-limited</strong>, at one current density
+      for still, aerated seawater. Real limiting currents vary several-fold with temperature,
+      flow and fouling, and a couple can be under mixed control instead, in which case the
+      ratio law is weaker than the strict proportionality drawn here.</li>
+    <li><strong>The attack is drawn as uniform thinning.</strong> Real galvanic attack on
+      aluminium is usually pitting, which perforates sooner than an averaged depth suggests —
+      so the real case is worse than the one drawn, not better.</li>
+    <li><strong>Resistance of the electrolyte path is ignored.</strong> In seawater that is
+      a fair simplification; in fresh water or damp concrete it is not, and distance from
+      the couple starts to matter a great deal.</li>
+    <li><strong>No passivation, no protective film, no polarity reversal.</strong> Aluminium
+      in particular depends on a passive film that this model does not represent, and some
+      couples reverse polarity with temperature.</li>
+    <li><strong>Time is compressed heavily</strong>, and it has to be: the mild settings take
+      decades. What you watch in a second is about a week.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE COUPLE, AND WHY THESE NUMBERS
+     ================================================================== */
+
+  var F     = 96485;      /* C/mol                                        */
+  var I_L   = 1.0e-4;     /* A/cm^2 — oxygen-limited cathodic current
+                             density on stainless in still aerated
+                             seawater. Reported values run a few tens of
+                             microamps per square centimetre.             */
+  var M_AL  = 26.98;      /* g/mol                                        */
+  var N_AL  = 3;          /* electrons per atom                           */
+  var RHO   = 2.70;       /* g/cm^3                                       */
+  var TOT   = 100;        /* cm^2 of wetted area, split between the two   */
+  var THK   = 3.0;        /* mm — the aluminium section being eaten       */
+
+  /* Faraday: how much metal one coulomb removes. cm^3 per coulomb. */
+  var VOL_PER_C = M_AL / (N_AL * F * RHO);
+
+  /* The control spans a fraction of the wetted area that is CATHODE. Not
+     taken to either extreme: at exactly zero there is no couple at all, and
+     the interesting behaviour is all in between. */
+  var U_MIN = 0.02, U_MAX = 0.98;
+
+  /* Time compression. The mild end takes over a century, the severe end
+     about three weeks, so no single rate makes every setting watchable —
+     and that is the point rather than a problem. This is set so the worst
+     case perforates in a few seconds; the mild settings then visibly do
+     almost nothing, which is what "safe" looks like. */
+  var ACCEL = 5e5;        /* about a week per second                      */
+
+  function areas(u) { return { Ac: TOT * u, Aa: TOT * (1 - u) }; }
+
+  /* THE WHOLE MODEL, IN THREE LINES.
+     Total current is set by the cathode alone, because that is the electrode
+     oxygen diffusion limits. It all leaves through the anode, so the anodic
+     current density is that total divided by the anode area — which is the
+     area ratio times the limiting density. */
+  function totalCurrent(u) { return areas(u).Ac * I_L; }
+  function anodeDensity(u) { var a = areas(u); return a.Ac * I_L / a.Aa; }
+  function rateMmPerSec(u) { return anodeDensity(u) * VOL_PER_C * 10; }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('gc-view');
+  var trace = document.getElementById('gc-trace');
+
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var SEA_Y = 86, SEA_B = 402;
+  var PL_X0 = 70, PL_X1 = 930;
+  var PL_TOP = 286, PL_H = 58;        /* the plate: PL_H units = THK mm     */
+
+  /* ONE SATURATED COLOUR, and it is the current. The metals are two cool
+     greys told apart in value, the water is a darker cool ground, and the
+     only saturated thing in the drawing is the corrosion current itself —
+     which is the thing the piece is about, and the thing that concentrates.
+     The damage is shown by geometry, not by colour, so the colour never
+     has to compete with itself. */
+  var AL    = 'rgb(150,163,176)';
+  var SS    = 'rgb(104,124,143)';
+  var CUR   = 'rgb(226,110,48)';
+
+  el('rect', { x: 0, y: SEA_Y, width: 1000, height: SEA_B - SEA_Y,
+               fill: 'rgb(18,30,42)' });
+  el('line', { x1: 0, y1: SEA_Y, x2: 1000, y2: SEA_Y,
+               stroke: 'rgb(90,120,145)', 'stroke-width': 1.6 });
+  el('text', { x: 16, y: SEA_Y - 10, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.55' }).textContent = 'seawater';
+
+  /* the two metals — widths are the control */
+  var anode  = el('rect', { y: PL_TOP, height: PL_H, fill: AL });
+  var cathode = el('rect', { y: PL_TOP, height: PL_H, fill: SS });
+  /* the join between them, drawn so the couple is visibly a couple */
+  var joinLine = el('line', { stroke: 'rgb(30,38,46)', 'stroke-width': 3 });
+
+  var anodeLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
+                              fill: 'currentColor', opacity: '.75' });
+  anodeLbl.textContent = 'aluminium';
+  var cathLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
+                             fill: 'currentColor', opacity: '.75' });
+  cathLbl.textContent = 'stainless steel';
+
+  /* the current: one path per unit of current, all landing on the anode */
+  var ARROWS = 34, arrows = [];
+  for (var i = 0; i < ARROWS; i++) {
+    arrows.push(el('path', { d: '', fill: 'none', stroke: CUR,
+                             'stroke-width': 1.7, opacity: '0' }));
+  }
+  var curLbl = el('text', { x: 500, y: SEA_Y + 34, 'class': 'lbl-sm',
+                            'text-anchor': 'middle', fill: CUR, opacity: '.9' });
+  curLbl.textContent = 'the corrosion current';
+
+  /* the hole, once there is one */
+  var hole = el('rect', { fill: 'rgb(18,30,42)', opacity: '0' });
+  var holeLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
+                             fill: CUR, opacity: '0' });
+  holeLbl.textContent = 'perforated';
+
+  /* -- the trace ---------------------------------------------------- */
+  var TSPAN = 26;                    /* seconds of wall clock on screen   */
+  var tracePts = el('polyline', { fill: 'none', stroke: 'rgb(190,205,218)',
+                                  'stroke-width': 2 }, trace);
+  el('line', { x1: 0, y1: 4, x2: 1000, y2: 4, stroke: CUR, 'stroke-width': 1,
+               'stroke-dasharray': '2 5', opacity: '.55' }, trace);
+
+  function tyDepth(d) {              /* d in mm, 0 at top of plate        */
+    var t = d / THK; if (t < 0) t = 0; if (t > 1) t = 1;
+    return 4 + t * 112;
+  }
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var u = U_MIN, depth = 0, simT = 0, hist = [], holed = false;
+
+  var reduce = false;
+  try {
+    reduce = window.matchMedia &&
+             window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) { reduce = false; }
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  function reset() {
+    depth = 0; simT = 0; hist = []; holed = false;
+    saidKey = null; say('mild'); render();
+  }
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    mild: 'Almost all of the wetted area is aluminium. The stainless is small, so the ' +
+          'current it can draw is small, and that little current is spread over a large ' +
+          'anode. Each part of the aluminium is losing almost nothing. This couple will ' +
+          'outlast the structure it is in.',
+    moderate: 'More stainless now. The current has gone up with it, and the aluminium it ' +
+              'has to leave through has got smaller — both changes push the same way. The ' +
+              'attack is no longer negligible, but it is still measured in years.',
+    severe: 'The aluminium is now the small one. All the current that all that stainless ' +
+            'can draw has to come out through this little patch, and the depth is visibly ' +
+            'moving. Nothing about the metals changed to do this. Only the proportions.',
+    holed: 'Perforated. Look at what was changed to get here: not the alloy, not the water, ' +
+           'not the temperature. Only which of the two metals got most of the area. The ' +
+           'same pair, the other way round, would still be intact.',
+    easing: 'More aluminium again. The same current is spread over more of it, so the rate ' +
+            'falls — but the metal already lost does not come back, and the depth on the ' +
+            'trace stays where it got to.'
+  };
+
+  var live = document.getElementById('gc-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     Corrosion is silent, so inventing a noise for it would be a lie about
+     the phenomenon. What is sonified instead is the thing the reader is
+     controlling: the current. A quiet hum whose level follows the anodic
+     current density, and a single knock when the plate is perforated.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, humGain = null;
+
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var len = Math.floor(audio.sampleRate * 2);
+      var buf = audio.createBuffer(1, len, audio.sampleRate), ch = buf.getChannelData(0), i;
+      for (i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * 0.4;
+      var src = audio.createBufferSource(); src.buffer = buf; src.loop = true;
+      var lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 340;
+      humGain = audio.createGain(); humGain.gain.value = 0;
+      src.connect(lp); lp.connect(humGain); humGain.connect(audio.destination);
+      src.start();
+    } catch (e) { audio = null; }
+  }
+  function setHum(v) {
+    if (!humGain || !audio) return;
+    humGain.gain.setTargetAtTime(soundOn ? v * 0.1 : 0, audio.currentTime, 0.2);
+  }
+  function knock() {
+    if (!audio || !soundOn) return;
+    var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 0.4), sr);
+    var d = b.getChannelData(0), i;
+    for (i = 0; i < d.length; i++) {
+      var t = i / sr;
+      d[i] = ((Math.random() * 2 - 1) * 0.5 + Math.sin(2 * Math.PI * 120 * t) * 0.5) *
+             Math.exp(-t * 15);
+    }
+    var s = audio.createBufferSource(); s.buffer = b;
+    var g = audio.createGain(); g.gain.value = 0.42;
+    s.connect(g); g.connect(audio.destination); s.start();
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var a = areas(u);
+    var w = PL_X1 - PL_X0;
+    var wa = w * (a.Aa / TOT), wc = w * (a.Ac / TOT);
+    var ax0 = PL_X0, ax1 = PL_X0 + wa;
+
+    /* the aluminium is eaten from its upper surface down */
+    var lost = Math.min(depth, THK) / THK * PL_H;
+    anode.setAttribute('x', ax0);
+    anode.setAttribute('width', Math.max(0.5, wa));
+    anode.setAttribute('y', PL_TOP + lost);
+    anode.setAttribute('height', Math.max(0, PL_H - lost));
+
+    cathode.setAttribute('x', ax1);
+    cathode.setAttribute('width', Math.max(0.5, wc));
+
+    joinLine.setAttribute('x1', ax1); joinLine.setAttribute('x2', ax1);
+    joinLine.setAttribute('y1', PL_TOP - 4); joinLine.setAttribute('y2', PL_TOP + PL_H + 4);
+
+    anodeLbl.setAttribute('x', Math.max(PL_X0 + 40, ax0 + wa / 2));
+    anodeLbl.setAttribute('y', PL_TOP + PL_H + 30);
+    cathLbl.setAttribute('x', Math.min(PL_X1 - 54, ax1 + wc / 2));
+    cathLbl.setAttribute('y', PL_TOP + PL_H + 30);
+
+    if (holed) {
+      hole.setAttribute('x', ax0); hole.setAttribute('width', Math.max(0.5, wa));
+      hole.setAttribute('y', PL_TOP); hole.setAttribute('height', PL_H);
+      hole.setAttribute('opacity', '1');
+      holeLbl.setAttribute('x', Math.max(PL_X0 + 52, ax0 + wa / 2));
+      holeLbl.setAttribute('y', PL_TOP - 14);
+      holeLbl.setAttribute('opacity', '.95');
+    } else {
+      hole.setAttribute('opacity', '0'); holeLbl.setAttribute('opacity', '0');
+    }
+
+    /* THE CURRENT. One stroke per unit of current, so the bundle grows with
+       the cathode — and every stroke has to land on the anode, so it also
+       crowds as the anode shrinks. Both halves of the mechanism are in the
+       same picture, which is the only reason to draw it this way. */
+    var n = Math.max(2, Math.round(ARROWS * (a.Ac / TOT)));
+    for (var i = 0; i < ARROWS; i++) {
+      if (i >= n) { arrows[i].setAttribute('opacity', '0'); continue; }
+      var fc = (i + 0.5) / n;
+      var xs = ax1 + wc * fc;                        /* leaves the stainless */
+      var fa = (i + 0.5) / n;
+      var xe = ax0 + Math.max(2, wa) * fa;           /* lands on the aluminium */
+      var lift = SEA_Y + 42 + 120 * (1 - fc) * 0.55;
+      arrows[i].setAttribute('d',
+        'M' + xs.toFixed(1) + ' ' + (PL_TOP - 2) +
+        ' Q' + ((xs + xe) / 2).toFixed(1) + ' ' + lift.toFixed(1) +
+        ' ' + xe.toFixed(1) + ' ' + (PL_TOP + lost - 2).toFixed(1));
+      arrows[i].setAttribute('opacity', holed ? '0.25' : '0.75');
+    }
+    curLbl.setAttribute('opacity', holed ? '.35' : '.9');
+
+    /* the trace */
+    if (hist.length > 1) {
+      var t0 = Math.max(0, simT - TSPAN * ACCEL), span = TSPAN * ACCEL, pts = [];
+      var stride = Math.max(1, Math.floor(hist.length / 500));
+      for (i = 0; i < hist.length; i += stride) {
+        var p = hist[i];
+        if (p[0] < t0) continue;
+        pts.push((((p[0] - t0) / span) * 1000).toFixed(1) + ',' + tyDepth(p[1]).toFixed(1));
+      }
+      tracePts.setAttribute('points', pts.join(' '));
+      document.getElementById('gc-cmp').textContent = 'Dotted: all the way through.';
+    } else {
+      tracePts.setAttribute('points', '');
+      document.getElementById('gc-cmp').textContent = '';
+    }
+
+    /* the control's value, in words */
+    view.setAttribute('aria-valuenow', Math.round((u - U_MIN) / (U_MAX - U_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      holed ? 'the aluminium has been perforated' :
+      u < 0.2 ? 'mostly aluminium' :
+      u < 0.5 ? 'more aluminium than stainless' :
+      u < 0.8 ? 'more stainless than aluminium' : 'almost all stainless');
+  }
+
+  /* ==================================================================
+     7. THE LOOP
+     ================================================================== */
+
+  var last = 0, carry = 0;
+  var DT = 3600;                      /* one hour of real time per step    */
+
+  function advance(dtReal) {
+    if (dtReal > 0.25) dtReal = 0.25;
+    carry += dtReal * ACCEL;
+    var steps = Math.floor(carry / DT);
+    if (steps > 4000) steps = 4000;
+    carry -= steps * DT;
+    if (carry > DT * 4000) carry = 0;   /* drop the debt, never bank it */
+
+    var rate = rateMmPerSec(u);
+    for (var s = 0; s < steps; s++) {
+      if (!holed) depth += rate * DT;
+      simT += DT;
+      if (s % 10 === 0 || s === steps - 1) {
+        hist.push([simT, depth]);
+        if (hist.length > 3000) hist.splice(0, hist.length - 3000);
+      }
+      if (!holed && depth >= THK) { depth = THK; holed = true; knock(); }
+    }
+
+    if (holed) say('holed');
+    else if (u < 0.25) say('mild');
+    else if (u < 0.6) say('moderate');
+    else say('severe');
+    setHum(Math.min(1, anodeDensity(u) / (I_L * 50)));
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    var dt = (now - last) / 1000; last = now;
+    advance(dt); render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION — the payoff without the motion
+
+     The whole exposure is solved in one synchronous pass and drawn as it
+     ended. Nothing animates; the payoff — a perforated plate — is still
+     fully reachable, and the trace still shows how the depth got there.
+     ================================================================== */
+
+  function solveStatic() {
+    depth = 0; simT = 0; hist = []; holed = false;
+    var rate = rateMmPerSec(u);
+    var horizon = Math.min(THK / rate * 1.15, 40 * 365 * 24 * 3600);
+    var step = horizon / 240, t = 0;
+    while (t < horizon) {
+      t += step; depth += rate * step;
+      if (depth >= THK) { depth = THK; holed = true; hist.push([t, depth]); break; }
+      hist.push([t, depth]);
+    }
+    simT = t; TSPAN = Math.max(1, t / ACCEL);
+  }
+
+  function reducedUpdate() {
+    solveStatic(); render(); saidKey = null;
+    live.textContent = (holed ? SAY.holed : u < 0.25 ? SAY.mild : u < 0.6 ? SAY.moderate : SAY.severe) +
+      ' Motion is reduced here, so the whole exposure is solved at once and drawn as it ' +
+      'ended, rather than played.';
+  }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, u0 = 0, TRAVEL = 300;
+
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setU(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    u = U_MIN + (U_MAX - U_MIN) * v;
+    if (reduce) reducedUpdate();
+  }
+
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); u0 = (u - U_MIN) / (U_MAX - U_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setU(u0 - (localY(ev) - y0) / TRAVEL);       /* up = more stainless */
+    ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = (u - U_MIN) / (U_MAX - U_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setU(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setU(v - 0.05);
+    else if (k === 'PageUp') setU(v + 0.2);
+    else if (k === 'PageDown') setU(v - 0.2);
+    else if (k === 'End') setU(1);
+    else if (k === 'Home') setU(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+
+  document.getElementById('gc-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    if (!soundOn) setHum(0);
+  });
+  document.getElementById('gc-reset').addEventListener('click', function () {
+    reset(); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. THE AREA-RATIO LAW, which is the claim the whole piece makes.
+          Anodic current density is the area ratio times the limiting
+          density — exactly, not approximately. */
+    var uA = 0.5, uB = 10 / 11;        /* ratios of 1 and 10 */
+    chk('anodic density at a ratio of one', anodeDensity(uA) / I_L, 1, 1e-9);
+    chk('anodic density at a ratio of ten', anodeDensity(uB) / I_L, 10, 1e-6);
+
+    /* 2. Faraday. The penetration rate must be the current density times
+          the volume one coulomb removes — the quantity the law names. */
+    var mmPerYear = rateMmPerSec(uA) * 3.156e7;
+    chk('penetration at a ratio of one', mmPerYear,
+        I_L * VOL_PER_C * 10 * 3.156e7, 1e-9, ' mm/yr');
+
+    /* 3. Time to perforate is inversely proportional to the ratio. */
+    var t1 = THK / rateMmPerSec(uA), t10 = THK / rateMmPerSec(uB);
+    chk('ten times the ratio, a tenth of the life', t1 / t10, 10, 1e-6);
+
+    /* 4. THE TOTAL CURRENT IS THE CATHODE'S BUSINESS ALONE. Doubling the
+          cathode doubles it; the anode does not appear. */
+    chk('total current scales with cathode area only',
+        totalCurrent(0.6) / totalCurrent(0.3), 2, 1e-9);
+
+    /* 5. Swapping which metal is the small one changes the rate by the
+          square of the ratio — the arithmetic behind "the same pair, the
+          other way round, would still be intact". */
+    var f = 0.2;
+    chk('swapping the areas', rateMmPerSec(1 - f) / rateMmPerSec(f),
+        Math.pow((1 - f) / f, 2), 1e-6);
+
+    /* 6. NEGATIVE CONTROL. Take the area ratio out — hold the anodic
+          density at the limiting density however the areas are split — and
+          check 1 must stop passing. An instrument that cannot fail is not
+          evidence. */
+    var realDensity = anodeDensity;
+    anodeDensity = function () { return I_L; };
+    var caught = Math.abs(anodeDensity(uB) / I_L - 10) > 1e-6;
+    anodeDensity = realDensity;
+    if (caught) out.push('PASS  negative control: a flat density fails the ratio check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (a ratio of one perforates in ' +
+             (THK / rateMmPerSec(uA) / (365 * 24 * 3600)).toFixed(1) +
+             ' years; fifty to one, in ' +
+             (THK / rateMmPerSec(50 / 51) / (24 * 3600)).toFixed(0) + ' days)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  reset();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('galvanic-corrosion: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate();
+  else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
