@@ -1,6 +1,6 @@
 # Deploying this site
 
-Twelve pages, twelve preview cards, a sitemap and a robots file. No build step, no
+Thirteen pages, thirteen preview cards, a sitemap and a robots file. No build step, no
 dependencies — the files are served exactly as they are.
 
 **It is already deployed.** GitHub Pages serves `main` from the repository root at

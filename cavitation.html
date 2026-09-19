@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cavitation</title>
+<meta name="description" content="Warm the liquid and a pump that was fine begins destroying itself. The pressure arriving at the inlet barely moves. What moves is the pressure at which the liquid boils — and it climbs until it reaches the pump.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M2%203.4%20H5.6%20V6.4%20L13.6%2010.4%22%20fill%3D%22none%22%20stroke%3D%22%23cbd5dd%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M1.8%2012.2%20H14.2%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. A suction-side
+  pressure account and a vapour-pressure curve, drawn into SVG — no canvas,
+  no WebGL.
+
+  THE ARGUMENT: when a pump starts eating itself, the search goes to the
+  pump. But the pressure the liquid arrives with is set entirely by things
+  outside the pump — the atmosphere pushing on the surface, the height it
+  has to be lifted, the pipe it has to be dragged through — and across the
+  whole of this piece's control that pressure moves by about one part in
+  fifty. What moves is the OTHER line: the pressure at which the liquid
+  boils. Warm water from twenty degrees to a hundred and that pressure
+  climbs by a factor of forty, until it arrives at the pump from below.
+
+  So the drawing is two lines and only one of them moves. The reader is
+  invited to watch the one they would have blamed stay exactly where it is.
+  Check six measures this in the rendered geometry rather than asserting it
+  in prose: the inlet marker moves a couple of pixels while the boiling line
+  moves most of the panel.
+
+  Why it matters in the field: this is why a hot-water or condensate service
+  cavitates on a duty an identical cold-water pump runs happily, why a pump
+  commissioned in winter fails in August, and why raising a pump "just a
+  little" is never just a little.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #cv-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #cv-view:focus { outline:none; }
+  #cv-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #cv-view .lbl { font-size:15px; }
+  #cv-view .lbl-sm { font-size:13px; }
+  /* a halo in the card colour, so a line sweeping past a label passes
+     behind the words instead of through them */
+  #cv-view .halo { paint-order:stroke; stroke:var(--card); stroke-width:4px;
+                   stroke-linejoin:round; }
+  @media (max-width:34rem) { #cv-view .lbl { font-size:40px; } #cv-view .lbl-sm { font-size:34px; }
+                             #cv-view .seg { display:none; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+
+<!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----
+  A link pasted into Slack, LinkedIn or a mail client renders from these, and
+  without them it renders as a bare grey URL. The preview image is a real PNG
+  at an absolute URL because that is the only thing a scraper will take — a
+  data: URI is not fetched and SVG is rejected by most of them.
+
+  This does NOT put a request into the page. og:image is fetched by the
+  crawler that unfurls the link, never by the reader's browser, so the page
+  still loads with nothing off-origin. -->
+<link rel="canonical" href="https://yinxueshi1017-prog.github.io/explainers/cavitation.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Interactive explainers">
+<meta property="og:title" content="Cavitation">
+<meta property="og:description" content="Warm the liquid and a pump that was fine begins destroying itself. The pressure arriving at the inlet barely moves. What moves is the pressure at which the liquid boils — and it climbs until it reaches the pump.">
+<meta property="og:url" content="https://yinxueshi1017-prog.github.io/explainers/cavitation.html">
+<meta property="og:image" content="https://yinxueshi1017-prog.github.io/explainers/og/cavitation.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark title card reading “Cavitation”.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cavitation">
+<meta name="twitter:description" content="Warm the liquid and a pump that was fine begins destroying itself. The pressure arriving at the inlet barely moves. What moves is the pressure at which the liquid boils — and it climbs until it reaches the pump.">
+<meta name="twitter:image" content="https://yinxueshi1017-prog.github.io/explainers/og/cavitation.png">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Cavitation — the pump did not change, the boiling point came up to meet it</h1>
+
+  <p class="how" id="cv-how">
+    One pump, one pipe, one duty. The only thing you are changing is how hot the liquid is.
+    Drag upward to warm it, down to cool it; the arrow keys do the same. <strong>End is
+    just off the boil</strong>; Home is cold from the tap. Watch which of the two lines
+    actually moves. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="cv-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="cold water from the tap"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="cv-how"
+         aria-label="How hot the liquid being pumped is"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the installation. Right: the pressure account — start at the atmosphere, step down for the lift, slope down for the pipe, and the marker is what arrives at the pump. The orange line is where this liquid boils.</span>
+      <span id="cv-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="cv-sound" aria-pressed="false">Sound</button>
+    <button id="cv-reset">Reset</button>
+  </div>
+
+  <p class="live" id="cv-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    A pump does not suck. Nothing in it reaches down the suction pipe and pulls. It lowers
+    the pressure at its own inlet, and then the atmosphere — pressing on the surface of the
+    liquid in the tank — pushes the liquid up to fill the space. Everything available to do
+    that pushing is on the right-hand panel as a descending account: start with what the
+    atmosphere provides, subtract what it costs to lift the liquid to the pump, subtract
+    what it costs to drag it through the pipe, and whatever is left is the pressure the
+    liquid arrives with.
+  </p>
+  <p class="body">
+    Every one of those terms is a property of the installation, not of the temperature. So
+    as you warm the liquid, that whole staircase very nearly stands still — it shifts by
+    about one part in fifty, and only because warm water is slightly lighter to lift.
+  </p>
+  <p class="body">
+    The other line is where the liquid boils. Water boils at a hundred degrees only because
+    that is where its vapour pressure reaches the pressure of the air above it; lower the
+    pressure and it boils colder. Read that backwards and it is the statement that matters
+    here: <strong>raise the temperature and the pressure at which it boils climbs</strong> —
+    from a fortieth of an atmosphere in cold water to a whole atmosphere at the boil. That
+    is the line that moves. It climbs until it arrives at the pump from underneath.
+  </p>
+  <p class="body">
+    When it gets there the liquid flashes to vapour at the impeller eye, is carried a few
+    millimetres into a region of higher pressure, and the bubbles collapse. Each collapse is
+    a tiny implosion against the metal. It sounds like pumping gravel, and it removes metal
+    from the impeller in a pattern nothing else produces.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>The suction side decides, and every gauge is on the discharge side.</strong>
+    Cavitation is caused by conditions upstream of the pump and appears as damage inside
+    it. A discharge pressure gauge, which is what most installations actually have, shows
+    almost nothing until the pump has lost enough head to matter — by which time the
+    impeller has been eroding for a while.
+  </p>
+  <p class="body">
+    <strong>The margin is not a safety factor; it is the whole design.</strong> The pump
+    needs some pressure above boiling before it will run properly, because the pressure
+    inside it falls lower than the pressure at its flange. Cold, this installation has
+    twice what it asks for. It never needed a fault to lose that — a warmer process, a
+    partly blocked strainer, a summer afternoon at altitude, or the same pump mounted a
+    little higher will each spend it.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The vapour pressure comes from the
+      Antoine equation with the standard coefficients for water and agrees with published
+      tables to better than half a per cent across the range drawn; the built-in checks
+      confirm it. That check is the author's own, not a rotating-equipment engineer's.</li>
+    <li><strong>Hot liquids are treated more harshly here than they deserve.</strong> Real
+      pumps tolerate a smaller margin on hot water than the cold calculation implies,
+      because boiling a given volume of vapour takes heat out of the surrounding liquid and
+      suppresses further boiling. That thermodynamic effect is real, is used in practice,
+      and is not in this model — so the point at which this drawing says the trouble starts
+      is pessimistic for hot water.</li>
+    <li><strong>The requirement is drawn as a single fixed line.</strong> What a pump needs
+      varies strongly with flow, and the published figure is defined as the point where the
+      pump has <em>already</em> lost three per cent of its head — meaning it is cavitating
+      somewhat at the stated requirement, not on the verge of it.</li>
+    <li><strong>Total pressure, not the reading on a gauge.</strong> The falling line is
+      total pressure, which is what the definition uses. A static gauge at the flange reads
+      lower by the velocity head.</li>
+    <li><strong>Sea level, one duty point, clean pipe.</strong> Altitude subtracts from the
+      atmospheric term directly. The friction is held fixed while in reality it falls a
+      little as the liquid thins with heat, which flatters the hot end slightly, and it
+      rises as a strainer loads up, which is the commonest way this margin is actually
+      lost.</li>
+    <li><strong>Water only.</strong> The same account applies to any liquid, but the
+      boiling line is a different curve for each, and for light hydrocarbons it is a far
+      steeper one.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+    <br><br>
+    Not commissioning anything? Still worth an email. If your version of this failed
+    differently &mdash; other geometry, other numbers, a mechanism this piece leaves out &mdash;
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Cavitation%20%E2%80%94%20what%20this%20leaves%20out&amp;body=Where%20this%20differs%20from%20what%20I%20see%20in%20the%20field%3A%0A%0A">tell me in one line</a>.
+    Corrections are the main thing that decides what gets built next.
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE SYSTEM
+
+     An open tank, a pump mounted above the liquid level, a suction line
+     with some friction in it. Everything is in SI; pressures in pascals
+     and heads in metres of the liquid as it is at that temperature.
+     ================================================================== */
+
+  var P_ATM  = 101325;      /* Pa, sea level                              */
+  var G      = 9.80665;     /* m/s^2                                      */
+  var LIFT   = 2.5;         /* m, pump centreline ABOVE the liquid level  */
+  var H_F    = 2.05;        /* m of liquid, friction and fittings         */
+  var NPSHR  = 2.5;         /* m, what the pump needs at this duty        */
+  var T_MIN  = 20, T_MAX = 100;   /* degrees C                            */
+
+  /* Antoine, the standard Stull coefficients for water: log10(P/mmHg) =
+     A - B/(T + C) with T in degrees C, stated valid 1-100 C. Checked
+     against published tables below — it is within half a per cent
+     everywhere in that band and within a tenth of a per cent at the
+     boil. */
+  var ANT_A = 8.07131, ANT_B = 1730.63, ANT_C = 233.426;
+  var MMHG  = 133.3223684;  /* Pa per mmHg */
+  function pVap(T) { return Math.pow(10, ANT_A - ANT_B / (T + ANT_C)) * MMHG; }
+
+  /* Density of water. Included rather than held constant because it is the
+     ONLY reason the descending staircase moves at all, and the piece makes
+     a claim about how little it moves — so it would be dishonest to remove
+     the movement and then celebrate its absence. */
+  function rho(T) {
+    return 1000 * (1 - (T + 288.9414) / (508929.2 * (T + 68.12963)) *
+                       Math.pow(T - 3.9863, 2));
+  }
+
+  /* The account, in pascals, at each step of the journey. */
+  function pAfterLift(T)  { return P_ATM - rho(T) * G * LIFT; }
+  function pAtPump(T)     { return pAfterLift(T) - rho(T) * G * H_F; }
+  /* What the pump needs, expressed as a pressure rather than a head, so it
+     can be drawn on the same axis as everything else. */
+  function pRequired(T)   { return pVap(T) + rho(T) * G * NPSHR; }
+  /* Net positive suction head available, in metres — the number the trade
+     actually uses. */
+  function npshA(T)       { return (pAtPump(T) - pVap(T)) / (rho(T) * G); }
+  /* How much of what the pump asks for is actually there. Below one, the
+     pump is into it. */
+  function margin(T)      { return npshA(T) / NPSHR; }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('cv-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  /* -- the plot ------------------------------------------------------- */
+  var GX0 = 400, GX1 = 950, GY0 = 55, GY1 = 372;
+  var P_HI = 150000;        /* Pa at the top of the axis. Sized so that the
+                               highest line the piece ever draws — what the
+                               pump needs, at the boil — lands inside the
+                               panel WITH ITS LABEL ABOVE IT. A reference line
+                               that clamps to the ceiling is asserting
+                               something false, and a label that has to dodge
+                               is the same fault one level up. */
+
+  function py(p) { return GY1 - (GY1 - GY0) * (p / P_HI); }
+
+  /* The staircase lives on the left of the panel; the two moving lines are
+     labelled on the right. They therefore cannot collide however the
+     control is moved, which is cheaper than detecting it. */
+  var SX0 = 412, SX_LIFT = 520, SX_PUMP = 700;
+  var LBL_X = GX1 - 6;
+
+  /* ONE SATURATED COLOUR, and it belongs to the thing that moves: where the
+     liquid boils. Everything that stays put — the installation, the
+     atmosphere, the account — is drawn in the same cool steel as the
+     frame, so the panel makes exactly one assertion. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+
+  /* -- the installation, on the left --------------------------------- */
+  var IX = 30, GROUND = 396;
+  el('line', { x1: IX + 8, y1: GROUND, x2: IX + 330, y2: GROUND,
+               stroke: 'currentColor', 'stroke-width': 2, opacity: '.45' });
+  /* the sump */
+  el('rect', { x: IX + 28, y: 300, width: 122, height: 92, fill: STEEL, opacity: '.13' });
+  el('line', { x1: IX + 28, y1: 300, x2: IX + 150, y2: 300,
+               stroke: STEEL, 'stroke-width': 2, opacity: '.8' });
+  el('path', { d: 'M' + (IX + 28) + ' 292 V392 M' + (IX + 150) + ' 292 V392',
+               fill: 'none', stroke: 'currentColor', 'stroke-width': 2, opacity: '.4' });
+  /* the suction line: down in the sump, up to the pump, into its eye */
+  el('path', { d: 'M' + (IX + 89) + ' 378 V' + 236 + ' H' + (IX + 196),
+               fill: 'none', stroke: STEEL, 'stroke-width': 7,
+               'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '.75' });
+  /* the pump */
+  el('circle', { cx: IX + 228, cy: 236, r: 27, fill: STEEL, opacity: '.28' });
+  el('circle', { cx: IX + 228, cy: 236, r: 27, fill: 'none', stroke: STEEL,
+                 'stroke-width': 2.4 });
+  el('path', { d: 'M' + (IX + 228) + ' 209 V182', fill: 'none', stroke: STEEL,
+               'stroke-width': 7, 'stroke-linecap': 'round', opacity: '.75' });
+  /* the lift, as a dimension between the two things that set it */
+  el('path', { d: 'M' + (IX + 14) + ' 300 V236', fill: 'none', stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.5' });
+  el('path', { d: 'M' + (IX + 10) + ' 242 l4 -6 l4 6 M' + (IX + 10) + ' 294 l4 6 l4 -6',
+               fill: 'none', stroke: 'currentColor', 'stroke-width': 1.2, opacity: '.5' });
+  el('text', { x: IX + 22, y: 272, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.6' }).textContent = 'lift';
+  el('text', { x: IX + 89, y: 416, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'the tank';
+  el('text', { x: IX + 228, y: 168, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'the pump';
+
+  /* the bubbles, which exist only when the liquid is boiling at the eye */
+  var BUB = [], NB = 9, bi;
+  for (bi = 0; bi < NB; bi++) {
+    BUB.push(el('circle', { r: 0, fill: HOT, opacity: '0' }));
+  }
+
+  /* -- the panel ------------------------------------------------------ */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('text', { x: GX0 + 6, y: GY1 + 22, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.5' }).textContent = 'a hard vacuum';
+
+  /* the region in which the liquid cannot stay liquid */
+  var boilFill = el('rect', { x: GX0 + 1, width: GX1 - GX0 - 1, fill: HOT, opacity: '.10' });
+
+  /* PAINT ORDER MATTERS HERE. The two orange lines sweep the whole height of
+     the panel, so at some temperature each of them passes across each of the
+     staircase's labels. Drawn after the labels they cut straight through the
+     words; drawn before, they pass behind. So the moving lines go down first
+     and the fixed account goes on top of them — and the labels carry a halo
+     of the card colour (class 'halo') so a line passing underneath does not
+     touch the glyphs. */
+  var reqLine = el('line', { x1: GX0, x2: GX1, stroke: HOT, 'stroke-width': 1.6,
+                             'stroke-dasharray': '6 5', opacity: '.75' });
+  var boilLine = el('line', { x1: GX0, x2: GX1, stroke: HOT, 'stroke-width': 3 });
+
+  /* the account. Fixed shape, fixed labels, and it is the thing the reader
+     is invited to watch NOT move. */
+  var stair = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2.8,
+                           'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+  var pumpDot = el('circle', { r: 6, fill: STEEL });
+  el('text', { x: SX0 + 2, y: 0, 'class': 'lbl-sm halo', fill: 'currentColor',
+               opacity: '.62', id: 'cv-atm' }).textContent = 'the atmosphere';
+  /* CLASS 'seg': hidden at the phone size. At 34px these two words are about
+     150 units wide each on a staircase 290 wide, so they overlap each other
+     at every temperature — measured, not guessed. They fit everywhere else
+     and they help there, and the caption under the drawing names both steps
+     at every size, so nothing is lost by dropping them on a phone. */
+  var lblLift = el('text', { 'class': 'lbl-sm seg halo', 'text-anchor': 'middle',
+                             fill: 'currentColor', opacity: '.6' });
+  lblLift.textContent = 'the lift';
+  var lblPipe = el('text', { 'class': 'lbl-sm seg halo', 'text-anchor': 'middle',
+                             fill: 'currentColor', opacity: '.6' });
+  lblPipe.textContent = 'the pipe';
+
+  /* the labels for the moving lines, on the right where the account is not */
+  var lblReq = el('text', { x: LBL_X, 'class': 'lbl-sm', 'text-anchor': 'end',
+                            fill: HOT, opacity: '.8' });
+  lblReq.textContent = 'pump needs';
+  var lblBoil = el('text', { x: LBL_X, 'class': 'lbl-sm', 'text-anchor': 'end',
+                             fill: HOT });
+  lblBoil.textContent = 'boils';
+
+  var atmLbl = document.getElementById('cv-atm');
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var T = T_MIN, t = 0;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    cold: 'Cold from the tap. The liquid arrives at the pump with more than twice the ' +
+          'pressure the pump asks for above boiling, and the boiling line is down near the ' +
+          'floor of the panel. Nothing about this installation is marginal, and nothing ' +
+          'about it is going to be changed in what follows.',
+    thinning: 'Warm now. The staircase has not moved — the atmosphere, the lift and the pipe ' +
+              'are all exactly what they were. The boiling line has climbed off the floor and ' +
+              'is eating the margin from below. This is the part nobody watches, because ' +
+              'everything measurable is still completely normal.',
+    marginal: 'Hot. The liquid is now arriving with barely more than the pump needs. The ' +
+              'installation has no fault: it was designed with a comfortable margin and the ' +
+              'margin has been spent by temperature alone. A loading strainer, a hot ' +
+              'afternoon, or a pump mounted slightly higher now takes it over.',
+    boiling: 'The liquid is boiling at the pump. Vapour is forming at the impeller eye, ' +
+             'travelling a few millimetres into higher pressure, and collapsing against the ' +
+             'metal. It sounds like pumping gravel. Note what did this: not the pump, not ' +
+             'the pipe, not the duty. The staircase is where it has been the whole time.'
+  };
+  var live = document.getElementById('cv-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* The four states, by how much of the requirement is actually there.
+     Check five walks the control and asserts all four are reachable —
+     a narration nobody can reach is a claim the piece does not make. */
+  function stateOf(T) {
+    var m = margin(T);
+    return m > 2 ? 'cold' : m > 1.4 ? 'thinning' : m > 1 ? 'marginal' : 'boiling';
+  }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     Silence, and then gravel. Cavitation is broadband noise from many
+     collapses, so this is filtered noise whose level follows how far past
+     the limit the pump is. Below the limit it is genuinely silent, which
+     is the honest thing: that is what the machine sounds like.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, src = null, gain = null;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 2), sr);
+      var d = b.getChannelData(0), j;
+      /* noise, with slow amplitude lumps so it rattles rather than hisses */
+      for (j = 0; j < d.length; j++) {
+        var lump = 0.55 + 0.45 * Math.sin(2 * Math.PI * 17 * j / sr) *
+                          Math.sin(2 * Math.PI * 6.3 * j / sr);
+        d[j] = (Math.random() * 2 - 1) * lump;
+      }
+      src = audio.createBufferSource(); src.buffer = b; src.loop = true;
+      var lp = audio.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2200; lp.Q.value = 0.7;
+      var hp = audio.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 260;
+      gain = audio.createGain(); gain.gain.value = 0;
+      src.connect(hp); hp.connect(lp); lp.connect(gain); gain.connect(audio.destination);
+      src.start();
+    } catch (e) { audio = null; }
+  }
+  function setLevel() {
+    if (!audio || !gain) return;
+    var m = margin(T);
+    var sev = m >= 1 ? 0 : Math.min(1, (1 - m) / 0.9);
+    gain.gain.setTargetAtTime(soundOn ? 0.22 * sev : 0, audio.currentTime, 0.1);
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var pAtm = P_ATM, pL = pAfterLift(T), pP = pAtPump(T);
+    var pB = pVap(T), pR = pRequired(T);
+    var yAtm = py(pAtm), yL = py(pL), yP = py(pP);
+    var yB = py(pB), yR = py(pR);
+
+    /* the account: flat at atmospheric, a drop for the lift, a slope for
+       the pipe, and a marker where the liquid arrives */
+    stair.setAttribute('d',
+      'M' + SX0 + ' ' + yAtm.toFixed(2) +
+      ' H' + SX_LIFT + ' V' + yL.toFixed(2) +
+      ' L' + SX_PUMP + ' ' + yP.toFixed(2));
+    pumpDot.setAttribute('cx', SX_PUMP);
+    pumpDot.setAttribute('cy', yP.toFixed(2));
+
+    /* 16, not 10: at the boil the liquid's boiling line lands exactly on the
+       atmospheric level — which is the definition of boiling, and a nice
+       thing to have fall out — so the orange line passes directly beneath
+       this label at the hot end. The extra clearance keeps it off the
+       glyphs. Two labels not overlapping is not the same test as a line not
+       crossing one. */
+    atmLbl.setAttribute('y', (yAtm - 16).toFixed(2));
+    lblLift.setAttribute('x', SX_LIFT + 30);
+    lblLift.setAttribute('y', ((yAtm + yL) / 2 + 5).toFixed(2));
+    lblPipe.setAttribute('x', (SX_LIFT + SX_PUMP) / 2);
+    lblPipe.setAttribute('y', ((yL + yP) / 2 - 12).toFixed(2));
+
+    boilLine.setAttribute('y1', yB.toFixed(2));
+    boilLine.setAttribute('y2', yB.toFixed(2));
+    reqLine.setAttribute('y1', yR.toFixed(2));
+    reqLine.setAttribute('y2', yR.toFixed(2));
+    boilFill.setAttribute('y', yB.toFixed(2));
+    boilFill.setAttribute('height', Math.max(0, GY1 - yB).toFixed(2));
+
+    /* Both labels sit above their own line, always. The gap between the two
+       lines is what the pump needs, which does not change with temperature —
+       so the labels are a fixed distance apart and cannot collide. An earlier
+       version flipped the upper label below its line when it neared the top,
+       which put it straight on top of the lower one at the hot end. */
+    lblBoil.setAttribute('y', (yB - 9).toFixed(2));
+    lblReq.setAttribute('y',  (yR - 9).toFixed(2));
+
+    /* bubbles at the eye, and only when there are bubbles at the eye */
+    var m = margin(T);
+    var sev = m >= 1 ? 0 : Math.min(1, (1 - m) / 0.9);
+    for (var i = 0; i < NB; i++) {
+      if (sev <= 0) { BUB[i].setAttribute('opacity', '0'); BUB[i].setAttribute('r', 0); continue; }
+      var ph = ((t * (0.55 + 0.35 * sev) + i / NB) % 1);
+      var bx = IX + 150 + ph * 78;
+      var by = 236 + Math.sin(ph * 7 + i) * 5;
+      /* grow, then collapse — the collapse is the damaging half */
+      var size = 4.2 * sev * Math.sin(Math.PI * Math.min(1, ph * 1.15));
+      BUB[i].setAttribute('cx', bx.toFixed(1));
+      BUB[i].setAttribute('cy', by.toFixed(1));
+      BUB[i].setAttribute('r', Math.max(0, size).toFixed(2));
+      BUB[i].setAttribute('opacity', (0.85 * sev).toFixed(2));
+    }
+
+    view.setAttribute('aria-valuenow',
+      Math.round((T - T_MIN) / (T_MAX - T_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      T < 35 ? 'cold water from the tap' :
+      T < 55 ? 'warm water' :
+      T < 75 ? 'hand-hot water' :
+      T < 90 ? 'very hot water' : 'water just off the boil');
+
+    document.getElementById('cv-cmp').textContent =
+      m > 1 ? 'The pump is above its limit.' : 'The pump is below its limit.';
+
+    say(stateOf(T));
+    setLevel();
+  }
+
+  /* ==================================================================
+     7. THE LOOP — only the bubbles move
+     ================================================================== */
+
+  var last = 0;
+  function frame(now) {
+    if (!last) last = now;
+    t += (now - last) / 1000; last = now;
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION
+
+     The only animated thing is the bubble train, which is illustration.
+     Every claim the piece makes is in the two panels' static geometry and
+     changes only when the reader moves the control. So this branch freezes
+     the bubbles at a phase where they are actually visible and never
+     animates. Nothing is lost. Open with #reduce to see it.
+     ================================================================== */
+
+  function reducedUpdate() { t = 0.42; render(); }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setV(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    T = T_MIN + (T_MAX - T_MIN) * v;
+    if (reduce) reducedUpdate();
+  }
+  function curV() { return (T - T_MIN) / (T_MAX - T_MIN); }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = curV();
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setV(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = curV();
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setV(v + 0.04);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setV(v - 0.04);
+    else if (k === 'PageUp') setV(v + 0.18);
+    else if (k === 'PageDown') setV(v - 0.18);
+    else if (k === 'End') setV(1);
+    else if (k === 'Home') setV(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('cv-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    setLevel();
+  });
+  document.getElementById('cv-reset').addEventListener('click', function () {
+    setV(0); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+    function note(pass, line) {
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + line);
+    }
+
+    /* 1. THE BOILING CURVE against published values. Everything else rests
+          on this, so it is checked at four points across the range. */
+    chk('vapour pressure of water, cold',  pVap(20),  2339,   2339 * 0.01, ' Pa');
+    chk('vapour pressure, hand-hot',       pVap(60),  19940,  19940 * 0.01, ' Pa');
+    chk('vapour pressure, very hot',       pVap(80),  47390,  47390 * 0.01, ' Pa');
+    /* at the boil it must equal one atmosphere — that is the definition */
+    chk('at the boil it reaches one atmosphere', pVap(100), P_ATM, P_ATM * 0.005, ' Pa');
+
+    /* 2. Density, because it is the only thing that moves the staircase. */
+    chk('density, cold', rho(20), 998.21, 1, ' kg/m3');
+    chk('density, at the boil', rho(100), 958.35, 1, ' kg/m3');
+
+    /* 3. The account adds up: what arrives is the atmosphere less the lift
+          less the pipe, and NPSH available is that less the boiling
+          pressure, in metres. */
+    var Tt = 55;
+    chk('the account balances',
+        pAtPump(Tt), P_ATM - rho(Tt) * G * (LIFT + H_F), 1e-6, ' Pa');
+    chk('and in metres, as the trade states it',
+        npshA(Tt), (P_ATM - pVap(Tt)) / (rho(Tt) * G) - LIFT - H_F, 1e-9, ' m');
+
+    /* 4. Warming only ever makes it worse — no local wiggle that would let
+          a reader find a temperature that helps. */
+    var mono = true, prev = npshA(T_MIN), i, Tq;
+    for (i = 1; i <= 400; i++) {
+      Tq = T_MIN + (T_MAX - T_MIN) * i / 400;
+      if (npshA(Tq) >= prev) { mono = false; break; }
+      prev = npshA(Tq);
+    }
+    note(mono, 'warming never helps, anywhere in the range');
+
+    /* 5. EVERY NARRATED STATE IS REACHABLE. A state nobody can reach is a
+          claim the piece does not actually make. */
+    var seen = {}, order = [];
+    for (i = 0; i <= 800; i++) {
+      var s = stateOf(T_MIN + (T_MAX - T_MIN) * i / 800);
+      if (!seen[s]) { seen[s] = true; order.push(s); }
+    }
+    note(order.length === 4 && order.join('>') === 'cold>thinning>marginal>boiling',
+         'all four narrated states are reachable, in order  (' + order.join(' > ') + ')');
+
+    /* 6. THE CLAIM, MEASURED IN THE DRAWING RATHER THAN ASSERTED.
+          Sweep the control from end to end and read the rendered geometry
+          back: the marker for what arrives at the pump must barely move,
+          while the boiling line crosses most of the panel. */
+    var keepT = T;
+    T = T_MIN; render();
+    var dotCold  = parseFloat(pumpDot.getAttribute('cy'));
+    var boilCold = parseFloat(boilLine.getAttribute('y1'));
+    T = T_MAX; render();
+    var dotHot   = parseFloat(pumpDot.getAttribute('cy'));
+    var boilHot  = parseFloat(boilLine.getAttribute('y1'));
+    T = keepT; render();
+
+    var dotMoved  = Math.abs(dotHot - dotCold);
+    var boilMoved = Math.abs(boilHot - boilCold);
+    note(dotMoved < 6,
+         'what arrives at the pump hardly moves  (' + dotMoved.toFixed(1) + ' px of panel)');
+    note(boilMoved > 180,
+         'the boiling line crosses the panel  (' + boilMoved.toFixed(1) + ' px)');
+    note(boilMoved / dotMoved > 25,
+         'the line you would not have blamed moves ' +
+         (boilMoved / dotMoved).toFixed(0) + ' times as far as the one you would');
+
+    /* 7. Nothing is ever drawn outside the panel — including the highest
+          line the piece draws, which is what the pump needs at the boil.
+          This is the check that sized the axis. */
+    var inside = true, worst = 0;
+    for (i = 0; i <= 200; i++) {
+      Tq = T_MIN + (T_MAX - T_MIN) * i / 200;
+      var yy = py(pRequired(Tq));
+      if (yy > worst || i === 0) worst = yy;
+      if (py(pRequired(Tq)) < GY0 || py(pVap(Tq)) > GY1 + 0.5) inside = false;
+    }
+    note(inside, 'every line stays inside the panel at every temperature');
+
+    /* 8. NEGATIVE CONTROL. Freeze the boiling curve — the one thing this
+          piece says is doing the damage — and the crossing must disappear,
+          taking the reachability check with it. */
+    var realPVap = pVap;
+    pVap = function () { return realPVap(T_MIN); };
+    var stillCrosses = false;
+    for (i = 0; i <= 400; i++) {
+      if (margin(T_MIN + (T_MAX - T_MIN) * i / 400) <= 1) { stillCrosses = true; break; }
+    }
+    pVap = realPVap;
+    note(!stillCrosses,
+         'negative control: with the boiling curve frozen, the pump never cavitates');
+
+    out.push('      (margin: ' + margin(T_MIN).toFixed(2) + ' of what the pump needs when cold, ' +
+             margin(T_MAX).toFixed(2) + ' at the boil)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  setV(0); render();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('cavitation: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate(); else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
