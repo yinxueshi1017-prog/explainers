@@ -70,6 +70,22 @@
            color:var(--ink-dim); font-size:.9rem; }
   a { color: var(--accent); }
   @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+  /* ---- ON PAPER ----
+     The palette above inverts the CSS colours for print, but the drawing sets
+     its own fills and opacities as ATTRIBUTES, which no palette reaches. A
+     label dimmed to .58 lands at 4.13:1 on white — under the 4.5 WCAG asks of
+     text — and the coloured ones at 3.80:1. So on paper the lettering goes to
+     full-strength ink. The LINES keep their colours, so the drawing still
+     reads in colour and survives a greyscale printer.
+
+     The second rule is the one that matters: opacity 0 is how these pieces
+     hide a label that does not apply yet, and forcing every label visible
+     would print claims the drawing is not making. The attribute selector is
+     the more specific, so it wins. */
+  @media print {
+    #sc-view text { opacity: 1 !important; fill: #1a1f24 !important; }
+    #sc-view text[opacity="0"] { opacity: 0 !important; }
+  }
 </style>
 
 <!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----

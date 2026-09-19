@@ -238,6 +238,29 @@ for p in pages:
         check(worst >= 4.5, "%s: every visible label clears 4.5:1 (worst %.2f, %s)"
               % (p, worst, worst_of))
 
+print("\nON PAPER  (the print palette cannot reach an attribute)")
+# Every piece ships a print palette, which inverts the CSS colours. It does
+# nothing at all to the drawing, whose fills and opacities are attributes: a
+# label dimmed to .58 lands at 4.13:1 on white, under the 4.5 WCAG asks of
+# text. Each piece that draws text therefore needs the print rule that lifts
+# its lettering to full-strength ink — AND the companion rule that keeps a
+# label hidden if the drawing is hiding it, since printing it would state a
+# claim the drawing is not making.
+for p in pages:
+    if "el('text'" not in src[p]:
+        continue                      # no SVG lettering; nothing to lift
+    m = re.search(r'id="([a-z]{2}-view)"', src[p])
+    if not m:
+        continue
+    vid = m.group(1)
+    block = re.search(r"@media print \{\s*#%s text \{[^}]*\}\s*#%s text\[opacity=\"0\"\] \{[^}]*\}"
+                      % (vid, vid), src[p])
+    check(block is not None, "%s: lettering is legible on paper" % p)
+    if block:
+        b = block.group(0)
+        check("opacity: 1 !important" in b, "%s: print lifts the dimmed labels" % p)
+        check("opacity: 0 !important" in b, "%s: print keeps hidden labels hidden" % p)
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
