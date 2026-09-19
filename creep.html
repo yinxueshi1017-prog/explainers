@@ -266,6 +266,11 @@
      cool steel, so the only saturated thing in the drawing is what was lost. */
   var STEEL = 'rgb(126,146,166)';
   var HOT   = 'rgb(226,78,38)';
+  /* The same colour, six points lighter in green: as TEXT the drawing's
+     orange is 4.47:1 on this card, just under the 4.5 that WCAG asks of
+     normal-size text. The lines keep the original, which only has to clear
+     the 3:1 asked of graphics. */
+  var HOT_TXT = 'rgb(226,84,38)';
 
   var comp = el('path', { d: '', fill: STEEL, opacity: '.72' });
   el('text', { x: PX + PW / 2, y: PY - 24, 'class': 'lbl-sm', 'text-anchor': 'middle',
@@ -294,9 +299,9 @@
                             fill: 'currentColor', opacity: '.7' });
   gotLbl.textContent = 'what it actually gets';
   el('text', { x: BX0, y: BY - 58, 'class': 'lbl-sm', fill: 'currentColor',
-               opacity: '.5' }).textContent = 'shorter';
+               opacity: '.58' }).textContent = 'shorter';
   el('text', { x: BX1, y: BY - 58, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.5' }).textContent = 'longer';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'longer';
 
   /* ==================================================================
      3. STATE

@@ -420,7 +420,7 @@
                          fill: 'rgb(26,32,38)', stroke: 'currentColor',
                          'stroke-width': 1, 'stroke-opacity': '.35' });
   el('text', { x: BOX_X + 12, y: BOX_Y + 24, 'class': 'lbl-sm',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'the air around it';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'the air around it';
 
   /* -- the cell ------------------------------------------------------ */
   el('rect', { x: CELL_X + 27, y: CELL_Y - 13, width: 26, height: 14, rx: 3,
@@ -433,7 +433,7 @@
   var vent = el('path', { d: '', fill: 'rgb(226,78,38)', opacity: '0' });
   el('text', { x: CELL_X + CELL_W / 2, y: CELL_Y + CELL_H + 30, 'class': 'lbl-sm',
                'text-anchor': 'middle', fill: 'currentColor',
-               opacity: '.55' }).textContent = 'the cell';
+               opacity: '.58' }).textContent = 'the cell';
 
   /* -- the balance diagram ------------------------------------------- */
   el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
@@ -451,8 +451,12 @@
   var genPath = el('path', { d: '', fill: 'none', stroke: 'rgb(226,78,38)',
                              'stroke-width': 2.6, 'stroke-linejoin': 'round' });
   var remLine = el('line', { stroke: 'rgb(150,172,190)', 'stroke-width': 2.2 });
+  /* lighter than the curve's orange by six points of green: as normal-size
+     text the drawing's colour is 4.47:1 on this card, just under the 4.5 that
+     WCAG asks of text. The curve keeps the original — a line only has to
+     clear the 3:1 asked of graphics. */
   el('text', { x: GX1, y: GY0 + 16, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'rgb(226,78,38)', opacity: '.95' }).textContent = 'heat the cell makes';
+               fill: 'rgb(226,84,38)' }).textContent = 'heat the cell makes';
   var remLbl = el('text', { 'class': 'lbl-sm', fill: 'rgb(150,172,190)', opacity: '.95',
                             'text-anchor': 'end' });
   remLbl.textContent = 'heat the case removes';

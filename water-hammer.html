@@ -456,8 +456,10 @@
   el('line', { x1: X0, y1: yHead(HV0 + DJ), x2: 996, y2: yHead(HV0 + DJ),
                stroke: 'rgb(224,86,40)', 'stroke-width': 1,
                'stroke-dasharray': '2 5', opacity: '.6' });
+  /* full strength: this orange is 4.62:1 on the card, but only at full
+     strength — at .9 it fell to 3.95 and under WCAG's 4.5 for text. */
   el('text', { x: 996, y: yHead(HV0 + DJ) - 6, fill: 'rgb(224,86,40)', 'text-anchor': 'end',
-               'class': 'lbl', opacity: '.9' }).textContent = 'full surge';
+               'class': 'lbl' }).textContent = 'full surge';
 
   /* -- the head line ---------------------------------------------------- */
   var grade = el('polyline', { fill: 'none', stroke: 'rgb(190,205,218)',

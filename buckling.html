@@ -255,6 +255,7 @@
      than three colours agreeing. */
   var STEEL = 'rgb(126,146,166)';
   var EULER = 'rgb(226,78,38)';
+  var EULER_TXT = 'rgb(226,84,38)';
   var GCOL = ['rgb(96,116,136)', 'rgb(140,162,184)', 'rgb(196,214,230)'];
 
   /* -- the strut ----------------------------------------------------- */
@@ -276,9 +277,9 @@
   el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
                'stroke-width': 1.2, opacity: '.45' });
   el('text', { x: GX1, y: GY1 - 10, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'more slender →';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'more slender →';
   el('text', { x: GX0 - 8, y: GY0 + 4, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'carries more';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'carries more';
 
   var yieldLines = [], dots = [];
   for (var i = 0; i < GRADES.length; i++) {
@@ -289,7 +290,7 @@
   var euler = el('path', { d: '', fill: 'none', stroke: EULER, 'stroke-width': 2.6,
                            'stroke-linejoin': 'round' });
   var eulerLbl = el('text', { x: GX1, y: GY0 + 18, 'class': 'lbl-sm', 'text-anchor': 'end',
-                              fill: EULER, opacity: '.9' });
+                              fill: EULER_TXT });
   eulerLbl.textContent = 'what slenderness allows';
   var nowLine = el('line', { y1: GY0, y2: GY1, stroke: 'currentColor',
                              'stroke-width': 1, opacity: '.35' });

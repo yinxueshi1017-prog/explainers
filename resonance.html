@@ -271,6 +271,11 @@
      reference rather than as two competing claims. */
   var STEEL = 'rgb(126,146,166)';
   var HOT   = 'rgb(226,78,38)';
+  /* The same colour, six points lighter in green: as TEXT the drawing's
+     orange is 4.47:1 on this card, just under the 4.5 that WCAG asks of
+     normal-size text. The lines keep the original, which only has to clear
+     the 3:1 asked of graphics. */
+  var HOT_TXT = 'rgb(226,84,38)';
 
   /* -- the structure: a mass on a column, shaken ---------------------- */
   el('line', { x1: SX - 86, y1: SY_BASE, x2: SX + 86, y2: SY_BASE,
@@ -279,7 +284,7 @@
                          'stroke-linecap': 'round' });
   var mass = el('rect', { width: 96, height: 46, rx: 3, fill: STEEL });
   el('text', { x: SX, y: SY_BASE + 30, 'class': 'lbl-sm', 'text-anchor': 'middle',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'shaken here';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'shaken here';
   var swing = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 1.6,
                            'stroke-dasharray': '3 4', opacity: '.5' });
 
@@ -289,14 +294,14 @@
   el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
                'stroke-width': 1.2, opacity: '.45' });
   el('text', { x: GX1, y: GY1 - 10, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'shaken faster →';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'shaken faster →';
   el('text', { x: GX0 - 8, y: GY0 + 4, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'magnified';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'magnified';
   /* the line below which the structure does not magnify at all */
   el('line', { x1: GX0, y1: gy(1), x2: GX1, y2: gy(1), stroke: 'currentColor',
                'stroke-width': 1, 'stroke-dasharray': '3 5', opacity: '.35' });
   el('text', { x: GX1, y: gy(1) - 8, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.45' }).textContent = 'no magnification';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'no magnification';
 
   var ghost = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2,
                            opacity: '.5', 'stroke-dasharray': '5 4' });

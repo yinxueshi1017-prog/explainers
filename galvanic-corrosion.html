@@ -336,7 +336,7 @@
   el('line', { x1: 0, y1: SEA_Y, x2: 1000, y2: SEA_Y,
                stroke: 'rgb(90,120,145)', 'stroke-width': 1.6 });
   el('text', { x: 16, y: SEA_Y - 10, 'class': 'lbl-sm', fill: 'currentColor',
-               opacity: '.55' }).textContent = 'seawater';
+               opacity: '.58' }).textContent = 'seawater';
 
   /* the two metals — widths are the control */
   var anode  = el('rect', { y: PL_TOP, height: PL_H, fill: AL });
@@ -364,7 +364,7 @@
   /* the hole, once there is one */
   var hole = el('rect', { fill: 'rgb(18,30,42)', opacity: '0' });
   var holeLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
-                             fill: CUR, opacity: '0' });
+                             fill: CUR, opacity: '.58' });
   holeLbl.textContent = 'perforated';
 
   /* -- the trace ---------------------------------------------------- */
@@ -503,7 +503,7 @@
       hole.setAttribute('opacity', '1');
       holeLbl.setAttribute('x', Math.max(PL_X0 + 52, ax0 + wa / 2));
       holeLbl.setAttribute('y', PL_TOP - 14);
-      holeLbl.setAttribute('opacity', '.95');
+      holeLbl.setAttribute('opacity', '1');
     } else {
       hole.setAttribute('opacity', '0'); holeLbl.setAttribute('opacity', '0');
     }
@@ -526,7 +526,16 @@
         ' ' + xe.toFixed(1) + ' ' + (PL_TOP + lost - 2).toFixed(1));
       arrows[i].setAttribute('opacity', holed ? '0.25' : '0.75');
     }
-    curLbl.setAttribute('opacity', holed ? '.35' : '.9');
+    /* Was '.35' once the plate was holed — a deliberate "this no longer
+       applies" fade that measured 1.7:1, which is not dim, it is gone. A
+       single-frame contrast check never saw it because it only happens in
+       one state. De-emphasis now stays inside legibility. */
+    /* Once holed this used to fade to '.35' — 1.7:1, which is not dim, it is
+       gone; then '.62', still only 2.8:1. On a saturated colour against this
+       card, opacity cannot express de-emphasis and stay legible: below about
+       .90 it falls under WCAG's 4.5 for text. So the fade is now token, and
+       the "this is no longer the point" job belongs to the narration. */
+    curLbl.setAttribute('opacity', holed ? '.9' : '1');
 
     /* the trace */
     if (hist.length > 1) {

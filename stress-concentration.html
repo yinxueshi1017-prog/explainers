@@ -260,6 +260,11 @@
      piling up at the ends of the hole, which is the entire subject. */
   var STEEL = 'rgb(126,146,166)';
   var HOT   = 'rgb(226,78,38)';
+  /* The same colour, six points lighter in green: as TEXT the drawing's
+     orange is 4.47:1 on this card, just under the 4.5 that WCAG asks of
+     normal-size text. The lines keep the original, which only has to clear
+     the 3:1 asked of graphics. */
+  var HOT_TXT = 'rgb(226,84,38)';
 
   el('rect', { x: PX, y: PY, width: PW, height: PH, rx: 2, fill: STEEL, opacity: '.5' });
 
@@ -285,7 +290,7 @@
                  stroke: 'currentColor', 'stroke-width': 2, opacity: '.45' });
   }
   el('text', { x: PX - 44, y: PY - 20, 'class': 'lbl-sm', fill: 'currentColor',
-               opacity: '.55' }).textContent = 'pulled this way';
+               opacity: '.58' }).textContent = 'pulled this way';
 
   /* the two bars: what the shape did, and what the lost area did */
   var barK = el('rect', { x: BAR_X, width: BAR_W, fill: HOT });
@@ -303,7 +308,7 @@
                'text-anchor': 'middle', fill: 'currentColor',
                opacity: '.7' }).textContent = 'lost area';
   el('text', { x: BAR_R, y: BAR_TOP - 34, 'class': 'lbl-sm', 'text-anchor': 'end',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'stress multiplier';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'stress multiplier';
   /* the round-hole answer, marked once and never moved */
   var threeY = BAR_BOT - (BAR_BOT - BAR_TOP) * 3 / K_MAX;
   el('line', { x1: BAR_X - 24, y1: threeY, x2: BAR_R, y2: threeY,
@@ -311,10 +316,10 @@
                opacity: '.4' });
   el('text', { x: BAR_R, y: threeY - 8, 'class': 'lbl-sm',
                'text-anchor': 'end', fill: 'currentColor',
-               opacity: '.5' }).textContent = 'a round hole';
+               opacity: '.58' }).textContent = 'a round hole';
   /* INSIDE the bar area: above it, this shared a band with the caption. */
   var overflow = el('text', { x: BAR_X + BAR_W / 2, y: BAR_TOP + 26, 'class': 'lbl-sm',
-                              'text-anchor': 'middle', fill: HOT, opacity: '0' });
+                              'text-anchor': 'middle', fill: HOT_TXT });
   overflow.textContent = 'off the top';
 
   /* ==================================================================
@@ -417,7 +422,10 @@
     barK.setAttribute('y', BAR_BOT - hk); barK.setAttribute('height', Math.max(0, hk));
     var hn = (BAR_BOT - BAR_TOP) * Math.min(1, netFactor() / K_MAX);
     barN.setAttribute('y', BAR_BOT - hn); barN.setAttribute('height', Math.max(0, hn));
-    overflow.setAttribute('opacity', k > K_MAX ? '.95' : '0');
+    /* '.95' measured 4.27:1 — under WCAG's 4.5 for text, and only in the one
+       state where the bar has run off the scale, which a single-frame check
+       never visits. Shown or hidden; no fade in between. */
+    overflow.setAttribute('opacity', k > K_MAX ? '1' : '0');
 
     document.getElementById('sc-cmp').textContent =
       Math.abs(k - 3) < 0.02 ? 'A round hole: exactly three, at any size.' : '';

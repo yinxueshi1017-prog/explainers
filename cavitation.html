@@ -332,6 +332,11 @@
      frame, so the panel makes exactly one assertion. */
   var STEEL = 'rgb(126,146,166)';
   var HOT   = 'rgb(226,78,38)';
+  /* The same colour, six points lighter in green: as TEXT the drawing's
+     orange is 4.47:1 on this card, just under the 4.5 that WCAG asks of
+     normal-size text. The lines keep the original, which only has to clear
+     the 3:1 asked of graphics. */
+  var HOT_TXT = 'rgb(226,84,38)';
 
   /* -- the installation, on the left --------------------------------- */
   var IX = 30, GROUND = 396;
@@ -361,9 +366,9 @@
   el('text', { x: IX + 22, y: 272, 'class': 'lbl-sm', fill: 'currentColor',
                opacity: '.6' }).textContent = 'lift';
   el('text', { x: IX + 89, y: 416, 'class': 'lbl-sm', 'text-anchor': 'middle',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'the tank';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'the tank';
   el('text', { x: IX + 228, y: 168, 'class': 'lbl-sm', 'text-anchor': 'middle',
-               fill: 'currentColor', opacity: '.55' }).textContent = 'the pump';
+               fill: 'currentColor', opacity: '.58' }).textContent = 'the pump';
 
   /* the bubbles, which exist only when the liquid is boiling at the eye */
   var BUB = [], NB = 9, bi;
@@ -377,7 +382,7 @@
   el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
                'stroke-width': 1.2, opacity: '.45' });
   el('text', { x: GX0 + 6, y: GY1 + 22, 'class': 'lbl-sm', fill: 'currentColor',
-               opacity: '.5' }).textContent = 'a hard vacuum';
+               opacity: '.58' }).textContent = 'a hard vacuum';
 
   /* the region in which the liquid cannot stay liquid */
   var boilFill = el('rect', { x: GX0 + 1, width: GX1 - GX0 - 1, fill: HOT, opacity: '.10' });
@@ -414,10 +419,10 @@
 
   /* the labels for the moving lines, on the right where the account is not */
   var lblReq = el('text', { x: LBL_X, 'class': 'lbl-sm', 'text-anchor': 'end',
-                            fill: HOT, opacity: '.8' });
+                            fill: HOT_TXT });
   lblReq.textContent = 'pump needs';
   var lblBoil = el('text', { x: LBL_X, 'class': 'lbl-sm', 'text-anchor': 'end',
-                             fill: HOT });
+                             fill: HOT_TXT });
   lblBoil.textContent = 'boils';
 
   var atmLbl = document.getElementById('cv-atm');
