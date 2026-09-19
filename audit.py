@@ -280,6 +280,28 @@ check("cavitation", "cold, the margin is above what the pump needs",
 check("cavitation", "at the boil, it is not",
       1.0 if npsha(c["T_MAX"]) < c["NPSHR"] else 0.0, 1.0, 0.0)
 
+# ------------------------------------------------- across the whole site
+print("\nCONSISTENCY       the same physical constant, in more than one piece")
+# Nothing above would notice if two pieces disagreed about steel or gravity.
+# A reader who opens two of these in adjacent tabs would.
+e_buck = consts("buckling.html", ["E"])["E"]
+e_rest = consts("restrained-expansion.html", ["E"])["E"]
+check("site-wide", "steel modulus: buckling == restrained", e_buck, e_rest, 0.0, " MPa")
+check("site-wide", "...and it is the accepted value for steel", e_buck, 210000, 5000, " MPa")
+
+g_cav = consts("cavitation.html", ["G"])["G"]
+g_wh = consts("water-hammer.html", ["G"])["G"]
+# 9.80665 is standard gravity; 9.81 is the conventional value in hydraulics.
+# Both are defensible in their own piece, so this allows the difference but
+# holds it to a size that cannot change any claim either piece makes.
+check("site-wide", "gravity agrees between pieces to 0.1%",
+      abs(g_cav - g_wh) / g_cav, 0.0, 0.001)
+note("site-wide", "the two values of g in use", abs(g_cav - g_wh), " m/s2")
+
+fy_rest = consts("restrained-expansion.html", ["FY"])["FY"]
+check("site-wide", "the steel grade in restrained is one buckling also uses",
+      1.0 if fy_rest in (275, 355, 460) else 0.0, 1.0, 0.0)
+
 # --------------------------------------------------------------------- done
 print("\n" + "=" * 78)
 if fails:

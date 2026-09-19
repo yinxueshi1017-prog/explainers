@@ -164,6 +164,21 @@ for p in pages:
     check("github.com/yinxueshi1017-prog/explainers" in src[p],
           "%s: names audit.py and says where to get it" % p)
 
+# REVIEW.md is the only route by which "no engineer has reviewed this" ever
+# gets shorter, so every piece has to point at it and it has to cover every
+# piece. A twelfth explainer that shipped without an entry would be inviting a
+# review it gives the reviewer no way to start.
+check(os.path.exists("REVIEW.md"), "REVIEW.md exists")
+if os.path.exists("REVIEW.md"):
+    rv = open("REVIEW.md", encoding="utf-8").read()
+    headings = set(re.findall(r"^### (.+)$", rv, re.M))
+    for p in pages:
+        if "No engineer has reviewed this" not in src[p]:
+            continue
+        check("REVIEW.md" in src[p], "%s: offers the reviewer a way in" % p)
+        title = re.search(r"<title>(.*?)</title>", src[p], re.S).group(1).strip()
+        check(title in headings, "REVIEW.md has an entry for %s" % title)
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
