@@ -179,6 +179,65 @@ if os.path.exists("REVIEW.md"):
         title = re.search(r"<title>(.*?)</title>", src[p], re.S).group(1).strip()
         check(title in headings, "REVIEW.md has an entry for %s" % title)
 
+print("\nLEGIBILITY  (label opacity is a hierarchy; it is also a contrast budget)")
+# The drawings dim labels to build a hierarchy. Dimming is compositing, and
+# composited text has a contrast ratio. At the phone size these labels are 34px
+# and need 3:1; at desktop they are 13px NORMAL text and need 4.5:1, and the
+# colour does not change with the font size — so 4.5 is the binding constraint.
+# TEXT only: the lines keep their own colours, which only face the 3:1 that
+# WCAG asks of graphics.
+CARD = (20, 26, 32)        # --card, the stage the drawings sit on
+INK = (203, 213, 221)      # --ink, what currentColor resolves to
+
+def _lum(c):
+    f = []
+    for v in c:
+        v /= 255.0
+        f.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]
+
+def _ratio(a, b):
+    l1, l2 = _lum(a), _lum(b)
+    hi, lo = max(l1, l2), min(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+def _composite(fg, alpha):
+    return tuple(CARD[i] + (fg[i] - CARD[i]) * alpha for i in range(3))
+
+for p in pages:
+    if "el('text'" not in src[p]:
+        continue
+    colours = {n: tuple(int(x) for x in v.split(","))
+               for n, v in re.findall(r"var ([A-Z_]+)\s*=\s*'rgb\(\s*([0-9]+,\s*[0-9]+,\s*[0-9]+)\s*\)'",
+                                      src[p].replace(" ", ""))}
+    worst, worst_of = 99.0, ""
+    for block in re.findall(r"el\('text',\s*\{[^{}]*\}", src[p]):
+        m = re.search(r"opacity:\s*'([0-9.]+)'", block)
+        alpha = float(m.group(1)) if m else 1.0
+        if alpha < 0.02:
+            continue                                    # hidden, not dim
+        fm = re.search(r"fill:\s*'rgb\(([^)]+)\)'|fill:\s*([A-Z_]+)", block)
+        if fm and fm.group(1):
+            fg = tuple(int(x) for x in fm.group(1).replace(" ", "").split(","))
+        elif fm and fm.group(2):
+            fg = colours.get(fm.group(2), INK)
+        else:
+            fg = INK                                    # currentColor
+        r = _ratio(_composite(fg, alpha), CARD)
+        if r < worst:
+            worst, worst_of = r, block[:0] or ("opacity %.2f" % alpha)
+    # runtime fades on labels: anything visible has to stay readable
+    for name, val in re.findall(r"(\w*(?:Lbl|Label|overflow)\w*)\.setAttribute\('opacity',\s*[^;]*?'([0-9.]+)'", src[p]):
+        a = float(val)
+        if a < 0.02:
+            continue
+        r = _ratio(_composite(INK, a), CARD)
+        if r < worst:
+            worst, worst_of = r, "%s at %.2f" % (name, a)
+    if worst < 99:
+        check(worst >= 4.5, "%s: every visible label clears 4.5:1 (worst %.2f, %s)"
+              % (p, worst, worst_of))
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
