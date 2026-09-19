@@ -4491,7 +4491,14 @@ COMPOSITION — the split frame.
   var right = R3D.pool(gR, 2740);
 
   var rmq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  function reduced() { return !!(rmq && rmq.matches); }
+  /* AND A HASH HOOK, so the branch can be opened and checked without changing
+  an OS setting. Every other piece on the site has one; this piece — the one
+  whose reduced-motion path is by far the most involved, and therefore the one
+  most worth being able to look at — did not, which meant the only way to see
+  it was to change a system preference and reload. A branch nobody can open is
+  a branch nobody checks. */
+  var hashReduce = /(^|[#&])reduce\b/.test(location.hash || '');
+  function reduced() { return hashReduce || !!(rmq && rmq.matches); }
 
   var flash = document.createElementNS(NS, 'circle');
   flash.setAttribute('fill', LOOK.motion.flash.ink);

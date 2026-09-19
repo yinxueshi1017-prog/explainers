@@ -261,6 +261,22 @@ for p in pages:
         check("opacity: 1 !important" in b, "%s: print lifts the dimmed labels" % p)
         check("opacity: 0 !important" in b, "%s: print keeps hidden labels hidden" % p)
 
+print("\nTHE REDUCED-MOTION BRANCH  (a branch nobody can open is a branch nobody checks)")
+# Every piece honours prefers-reduced-motion. That setting lives in the
+# operating system, so the only way to look at the branch is to change a system
+# preference and reload — which means in practice it never gets looked at. Each
+# piece therefore also takes #reduce in the URL. The flagship did not, for
+# months, and it is the one whose reduced path is by far the most involved.
+for p in pages:
+    # Only the pieces with a drawing. The case study's use of the media query
+    # is a CSS rule switching transitions off — there is no branch behind it
+    # for a hash to open, and demanding one would be asking for a hook onto
+    # nothing.
+    if "prefers-reduced-motion" not in src[p] or not re.search(r'id="[a-z]{2}-view"', src[p]):
+        continue
+    check(re.search(r"reduce\\b.*test\(location\.hash|location\.hash.*reduce", src[p]) is not None,
+          "%s: its reduced-motion branch can be opened with #reduce" % p)
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
