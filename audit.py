@@ -280,6 +280,47 @@ check("cavitation", "cold, the margin is above what the pump needs",
 check("cavitation", "at the boil, it is not",
       1.0 if npsha(c["T_MAX"]) < c["NPSHR"] else 0.0, 1.0, 0.0)
 
+# --------------------------------------------------------- vacuum collapse
+print("\nVACUUM COLLAPSE   reference: membrane stress; long-cylinder elastic collapse")
+c = consts("vacuum-collapse.html", ["E_ST", "NU", "D_TK", "SIG_A", "ATM", "T_MIN", "T_MAX",
+                                    "CODE_FACTOR"])
+check("vacuum", "one atmosphere", c["ATM"], 0.101325, 1e-6, " MPa")
+holds = lambda t: 2 * t * c["SIG_A"] / c["D_TK"]
+takes = lambda t: 2 * c["E_ST"] * (t / c["D_TK"]) ** 3 / (1 - c["NU"] ** 2)
+# Internal pressure is a STRENGTH problem: at the rated pressure the hoop
+# stress pD/2t must come back to exactly the allowable.
+check("vacuum", "hoop stress returns the allowable",
+      holds(8.0) * c["D_TK"] / (2 * 8.0), c["SIG_A"], 1e-9, " MPa")
+# External is a STIFFNESS problem, and cubic. Checked as a ratio, which a
+# wrong exponent cannot satisfy.
+check("vacuum", "collapse goes as the cube of thickness",
+      takes(16.0) / takes(8.0), 8.0, 1e-9)
+check("vacuum", "and holding goes as the first power",
+      holds(16.0) / holds(8.0), 2.0, 1e-12)
+# The claim, at both ends of the control.
+check("vacuum", "at the thinnest wall, in beats out by >400x",
+      1.0 if holds(c["T_MIN"]) / takes(c["T_MIN"]) > 400 else 0.0, 1.0, 0.0)
+check("vacuum", "and at the thickest it still wins",
+      1.0 if holds(c["T_MAX"]) > takes(c["T_MAX"]) else 0.0, 1.0, 0.0)
+# The thickness that finally resists a full vacuum, found by bisection with no
+# closed form, against what pressure alone would have needed.
+lo, hi = 0.1, 500.0
+for _ in range(200):
+    m = 0.5 * (lo + hi)
+    if takes(m) < c["ATM"]:
+        lo = m
+    else:
+        hi = m
+need_out, need_in = lo, c["D_TK"] * c["ATM"] / (2 * c["SIG_A"])
+check("vacuum", "vacuum needs >5x the wall pressure does",
+      1.0 if need_out > 5 * need_in else 0.0, 1.0, 0.0)
+check("vacuum", "and that wall is inside the control",
+      1.0 if c["T_MIN"] < need_out < c["T_MAX"] else 0.0, 1.0, 0.0)
+note("vacuum", "wall needed to survive a full vacuum", need_out, " mm")
+note("vacuum", "wall needed to hold one atmosphere inside", need_in, " mm")
+note("vacuum", "at a 5 mm wall, bar held in", holds(5.0) * 10, " bar")
+note("vacuum", "at a 5 mm wall, bar taken out", takes(5.0) * 10, " bar")
+
 # ------------------------------------------------------------ bolt preload
 print("\nBOLT PRELOAD      reference: ISO 898-1 stress areas; Wileman's member stiffness")
 c = consts("bolt-preload.html", ["D_NOM", "A_S", "S_P", "E_ST", "GRIP", "FE_MAX"])

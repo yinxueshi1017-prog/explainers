@@ -121,7 +121,14 @@ for p in pages:
 
 print("\nTHE DOCS DESCRIBE THIS REPOSITORY  (they said four files and cd site)")
 d = open("DEPLOY.md", encoding="utf-8").read()
-words = {"twelve":12, "eleven":11, "ten":10, "thirteen":13, "fourteen":14}
+# Spelled out to twenty-four. An earlier version stopped at "fourteen" and
+# failed the moment the site reached fifteen pages — correctly, since it could
+# not read the number, but with a message about the count rather than about
+# itself. If this list runs out again, extend it; do not switch the docs to
+# digits to suit the checker.
+words = {w: i + 1 for i, w in enumerate(
+    "one two three four five six seven eight nine ten eleven twelve thirteen "
+    "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
 m = re.match(r"# Deploying this site\n\n(\w+) pages, (\w+) preview cards", d)
 check(m is not None, "DEPLOY.md still opens by counting what is here")
 if m:

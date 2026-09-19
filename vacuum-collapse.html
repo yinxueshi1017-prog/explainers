@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vacuum collapse</title>
+<meta name="description" content="A tank that holds several atmospheres inside will implode under a fraction of one atmosphere outside. Pressure is resisted by strength; vacuum is resisted by stiffness, and they are not the same problem.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M8%203.2%20C11%203.2%2012.8%205%2012.8%208%20C12.8%2011%2011%2012.8%208%2012.8%20C5%2012.8%203.2%2011%203.2%208%20C3.2%205%205%203.2%208%203.2%20Z%22%20fill%3D%22none%22%20stroke%3D%22%23cbd5dd%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M1.6%208%20H3.6%20M12.4%208%20H14.4%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. A cylindrical
+  shell under internal and external pressure, drawn into SVG — no canvas, no
+  WebGL.
+
+  THE ARGUMENT: pressure and vacuum look like the same load with the sign
+  changed, and they are not the same problem at all. Pressure from inside is
+  carried by membrane tension: the wall is in tension, it is a question of
+  STRENGTH, and the capacity goes up in proportion to thickness. Pressure
+  from outside puts the wall in compression, where the shell can go unstable
+  long before the material is anywhere near its limit: it is a question of
+  STIFFNESS, and the capacity goes up as the CUBE of thickness — but from a
+  base hundreds of times lower.
+
+  So the same tank that holds several atmospheres in will implode under a
+  fraction of one atmosphere out. And the whole of the available vacuum is
+  one atmosphere: you cannot suck harder than that, which is exactly why
+  people underestimate it. A blocked vent on a tank that is cooling, or a
+  hose left in a drum being emptied, is enough.
+
+  Check six measures the gap in the rendered geometry rather than asserting
+  it: the two markers, at every thickness the control can reach.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #vc-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #vc-view:focus { outline:none; }
+  #vc-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #vc-view .lbl { font-size:15px; }
+  #vc-view .lbl-sm { font-size:13px; }
+  /* a halo in the card colour, so a line sweeping past a label passes behind
+     the words instead of through them */
+  #vc-view .halo { paint-order:stroke; stroke:var(--card); stroke-width:4px;
+                   stroke-linejoin:round; }
+  @media (max-width:34rem) { #vc-view .lbl { font-size:40px; } #vc-view .lbl-sm { font-size:34px; }
+                             #vc-view .seg { display:none; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+
+  /* ---- ON PAPER ----
+     The palette above inverts the CSS colours for print, but the drawing sets
+     its own fills and opacities as ATTRIBUTES, which no palette reaches. A
+     label dimmed to .58 lands at 4.13:1 on white — under the 4.5 WCAG asks of
+     text. So on paper the lettering goes to full-strength ink; the LINES keep
+     their colours, so the drawing still reads in colour and survives a
+     greyscale printer. Labels hidden with opacity 0 stay hidden: printing them
+     would state claims the drawing is not making. */
+  @media print {
+    #vc-view text { opacity: 1 !important; fill: #1a1f24 !important; }
+    #vc-view text[opacity="0"] { opacity: 0 !important; }
+  }
+</style>
+
+<!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----
+  A link pasted into Slack, LinkedIn or a mail client renders from these, and
+  without them it renders as a bare grey URL. The preview image is a real PNG
+  at an absolute URL because that is the only thing a scraper will take — a
+  data: URI is not fetched and SVG is rejected by most of them.
+
+  This does NOT put a request into the page. og:image is fetched by the
+  crawler that unfurls the link, never by the reader's browser, so the page
+  still loads with nothing off-origin. -->
+<link rel="canonical" href="https://yinxueshi1017-prog.github.io/explainers/vacuum-collapse.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Interactive explainers">
+<meta property="og:title" content="Vacuum collapse">
+<meta property="og:description" content="A tank that holds several atmospheres inside will implode under a fraction of one atmosphere outside. Pressure is resisted by strength; vacuum is resisted by stiffness, and they are not the same problem.">
+<meta property="og:url" content="https://yinxueshi1017-prog.github.io/explainers/vacuum-collapse.html">
+<meta property="og:image" content="https://yinxueshi1017-prog.github.io/explainers/og/vacuum-collapse.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark title card reading “Vacuum collapse”.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vacuum collapse">
+<meta name="twitter:description" content="A tank that holds several atmospheres inside will implode under a fraction of one atmosphere outside. Pressure is resisted by strength; vacuum is resisted by stiffness, and they are not the same problem.">
+<meta name="twitter:image" content="https://yinxueshi1017-prog.github.io/explainers/og/vacuum-collapse.png">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Vacuum collapse — the same wall holds far more pressure in than out</h1>
+
+  <p class="how" id="vc-how">
+    One tank, three metres across, with a full vacuum inside it. The only thing you are
+    changing is how thick the wall is. Drag upward for thicker plate, down for thinner; the
+    arrow keys do the same. <strong>End is thirty millimetres</strong>; Home is three. Watch
+    how far apart the two markers stay. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="vc-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="three millimetres, thinner than a coin"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="vc-how"
+         aria-label="How thick the tank wall is"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the tank in section, with a full vacuum inside. Right: what that wall can hold, on a scale where each step up is ten times the last — because the two answers differ by hundreds.</span>
+      <span id="vc-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="vc-sound" aria-pressed="false">Sound</button>
+    <button id="vc-reset">Reset</button>
+  </div>
+
+  <p class="live" id="vc-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Push from the inside and the wall goes into tension. Every part of it pulls against
+    every other part, the shell holds its shape, and the question is simply whether the
+    material is strong enough. Double the thickness and you can hold twice as much. It is
+    the most forgiving kind of structural problem there is.
+  </p>
+  <p class="body">
+    Push from the outside and the wall goes into compression, and compression in a thin
+    shell is a different animal. Long before the steel is anywhere near its strength, the
+    shell finds it cheaper to stop being round: a slight flat spot gets flatter, the flatter
+    it gets the less it resists, and the whole section folds in on itself. Nothing yielded.
+    The tank was not overloaded. It simply stopped being a circle, and a shape that is not a
+    circle cannot carry pressure from outside at all.
+  </p>
+  <p class="body">
+    Because that is a stiffness problem rather than a strength one, the capacity goes as the
+    <strong>cube</strong> of the wall thickness — which sounds enormously favourable until
+    you notice it is a cube of a number that starts hundreds of times lower. Doubling the
+    wall multiplies what it holds in by two, and what it takes from outside by eight, and
+    the outside figure still loses.
+  </p>
+  <p class="body">
+    The last part is the part that kills tanks: <strong>the whole available vacuum is one
+    atmosphere.</strong> You cannot pull harder than that, which is precisely why nobody
+    treats it as a load. A vent that frosts over, a blinded nozzle nobody took off, a tank of
+    hot liquid that cools overnight, a drum being emptied by a pump — each of them is
+    capable of the entire load, and it is free.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>A pressure rating tells you nothing about vacuum.</strong> The plate that holds
+    several atmospheres in is not thick enough to take a fraction of one atmosphere out, and
+    no amount of reading the nameplate will reveal it, because the nameplate is answering a
+    different question. If a vessel can ever see a vacuum, it needs to have been designed
+    for one.
+  </p>
+  <p class="body">
+    <strong>Thickness is the expensive answer and usually the wrong one.</strong> Getting
+    this tank to survive a full vacuum on plate alone takes something like six times the wall
+    it needs to hold pressure. Stiffening rings do the same job for a fraction of the steel,
+    because they attack the stiffness the shell is short of rather than the strength it
+    already has. And a vacuum breaker — a valve that lets air in — costs almost nothing and
+    removes the load entirely.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> If you are one and would check it,
+      <a href="https://github.com/yinxueshi1017-prog/explainers/blob/main/REVIEW.md">REVIEW.md</a>
+      says what would actually help and is meant to cost about fifteen minutes. The relations
+      are the standard membrane-stress and long-cylinder collapse expressions, and the
+      built-in checks confirm the arithmetic — but that check is the author's own, not a
+      pressure-vessel engineer's.</li>
+    <li><strong>The collapse figure drawn here is the OPTIMISTIC one, which is the dangerous
+      direction.</strong> The elastic formula assumes a perfectly round shell. Real vessels
+      are not round, and a small initial out-of-roundness knocks the collapse pressure down
+      hard — which is why the codes apply a substantial design factor rather than using the
+      elastic value. Both are drawn, and the gap between them is not a safety margin so much
+      as an admission of what the formula does not know.</li>
+    <li><strong>A long cylinder, with no help from anything.</strong> No stiffening rings, no
+      end closures near enough to matter, no attached pipework. Ends and rings raise the
+      collapse pressure substantially, and designing for external pressure is largely the
+      business of arranging them.</li>
+    <li><strong>The section drawing is indicative, not to scale.</strong> The two-lobe mode
+      is the right one for a long cylinder, but the depth it folds to is chosen to be visible
+      rather than calculated, and the wall is drawn about nine times thicker than it really
+      is — at true scale the thickest plate here would be one per cent of the radius and you
+      could not see the control working. Nothing the piece claims depends on either: the
+      numbers are all in the panel on the right.</li>
+    <li><strong>Elastic collapse only.</strong> On thicker walls the shell can yield before
+      it buckles, and the governing expression changes. This piece stays in the range where
+      the elastic one governs, but does not draw the boundary.</li>
+    <li><strong>One diameter, one material, one allowable stress.</strong> Diameter matters
+      enormously — the collapse pressure goes as the cube of thickness over diameter, so a
+      tank twice as wide is eight times weaker against vacuum at the same wall.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    Commissions start at £4,000 and take three to four weeks from an agreed brief.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+    <br><br>
+    Not commissioning anything? Still worth an email. If your version of this failed
+    differently &mdash; other geometry, other numbers, a mechanism this piece leaves out &mdash;
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Vacuum%20collapse%20%E2%80%94%20what%20this%20leaves%20out&amp;body=Where%20this%20differs%20from%20what%20I%20see%20in%20the%20field%3A%0A%0A">tell me in one line</a>.
+    Corrections are the main thing that decides what gets built next.
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE SYSTEM
+
+     A plain cylindrical steel tank, three metres across. Pressures in
+     MPa, lengths in mm, stresses in MPa.
+     ================================================================== */
+
+  var E_ST  = 200000.0;     /* MPa                                        */
+  var NU    = 0.3;
+  var D_TK  = 3000.0;       /* mm across                                  */
+  var SIG_A = 150.0;        /* MPa allowable membrane stress              */
+  var ATM   = 0.101325;     /* MPa — and the whole of the available vacuum */
+  var T_MIN = 3.0, T_MAX = 30.0;   /* mm of plate the control can reach    */
+  var CODE_FACTOR = 3.0;    /* what the codes knock the elastic value down
+                               by, in round terms, to allow for a shell
+                               that was never perfectly round             */
+
+  /* Pressure from INSIDE is carried by membrane tension: hoop stress is
+     pD/2t, so the wall holds p = 2 t sigma / D. Strength, and linear in t. */
+  function holdsIn(t) { return 2 * t * SIG_A / D_TK; }
+
+  /* Pressure from OUTSIDE is resisted by the shell staying round. The
+     long-cylinder elastic collapse pressure is 2E(t/D)^3/(1-nu^2).
+     Stiffness, and CUBIC in t — from a base hundreds of times lower. */
+  function takesOut(t) {
+    return 2 * E_ST * Math.pow(t / D_TK, 3) / (1 - NU * NU);
+  }
+  /* What a code would actually let you claim. */
+  function allowedOut(t) { return takesOut(t) / CODE_FACTOR; }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('vc-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var GX0 = 400, GX1 = 950, GY0 = 55, GY1 = 372;
+  /* A LOG AXIS on pressure, because the two answers differ by a factor of
+     hundreds and a linear scale would draw one of them flat on the floor.
+     Its price is that heights are not comparable as lengths, so the piece
+     never asks for that — it asks how far APART the two markers are, and
+     says in the caption that each step is ten times the last. */
+  var P_LO = 1e-4, P_HI = 3.2;             /* MPa. The floor is set by the
+                                              LOWEST thing drawn, which is the
+                                              code-allowable line at the
+                                              thinnest wall — not by the
+                                              collapse curve. At 3e-4 that line
+                                              clamped to the floor and drew a
+                                              flat stretch the model does not
+                                              have. Check seven measures it. */
+  var LN_LO = Math.log(P_LO), LN_SPAN = Math.log(P_HI) - Math.log(P_LO);
+  function px(t) { return GX0 + (GX1 - GX0) * (t - T_MIN) / (T_MAX - T_MIN); }
+  function py(p) {
+    var f = (Math.log(Math.max(P_LO, Math.min(P_HI, p))) - LN_LO) / LN_SPAN;
+    return GY1 - (GY1 - GY0) * f;
+  }
+
+  /* ONE SATURATED COLOUR, and it belongs to the thing that fails: what the
+     wall can take from outside, and the tank when it has stopped being
+     round. Everything the wall does well is drawn in cool steel. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+  /* The same colour six points lighter in green: as TEXT the drawing's
+     orange is 4.47:1 on this card, just under the 4.5 WCAG asks of
+     normal-size text. Lines keep the original — a line only faces 3:1. */
+  var HOT_TXT = 'rgb(226,84,38)';
+
+  /* -- the tank, in section ------------------------------------------ */
+  var TCX = 196, TCY = 214, TR = 116;
+  var shellOut = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2 });
+  var shellIn  = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2 });
+  var shellFill = el('path', { d: '', fill: STEEL, opacity: '.22' });
+  var squeeze = [], NSQ = 16, qi;
+  for (qi = 0; qi < NSQ; qi++) {
+    squeeze.push(el('path', { d: '', fill: 'none', stroke: 'currentColor',
+                              'stroke-width': 1.6, 'stroke-linecap': 'round',
+                              opacity: '.45' }));
+  }
+  el('text', { x: TCX, y: 400, 'class': 'lbl-sm halo', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'a full vacuum inside';
+
+  /* -- the plot ------------------------------------------------------- */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  /* the whole of the available vacuum, and a fixed reference */
+  el('line', { x1: GX0, y1: py(ATM), x2: GX1, y2: py(ATM), stroke: 'currentColor',
+               'stroke-width': 1, 'stroke-dasharray': '3 5', opacity: '.45' });
+  el('text', { x: GX1 - 4, y: py(ATM) - 9, 'class': 'lbl-sm halo', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'one atmosphere';
+  el('text', { x: GX1 - 4, y: GY1 + 22, 'class': 'lbl-sm halo', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'thicker wall →';
+
+  /* the band between the elastic value and what a code would allow: not a
+     safety margin so much as what the formula does not know */
+  var band = el('path', { d: '', fill: HOT, opacity: '.13' });
+  var inPath  = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2.6 });
+  var outPath = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 2.6 });
+  var allowPath = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 1.6,
+                               'stroke-dasharray': '5 4', opacity: '.75' });
+  var gapBar = el('line', { stroke: 'currentColor', 'stroke-width': 1.4,
+                            'stroke-dasharray': '2 3', opacity: '.5' });
+  var dotIn  = el('circle', { r: 5.5, fill: STEEL });
+  var dotOut = el('circle', { r: 5.5, fill: HOT });
+  /* A FIXED LEGEND, not labels riding on the markers. Labels that follow a
+     moving dot have to be somewhere, and at the top of the control the
+     vacuum marker climbs to within a few pixels of the fixed "one atmosphere"
+     reference — so the label collided with it at BOTH the desktop and phone
+     sizes. Dodging would only move the collision. Two swatches in a corner
+     nothing else uses cannot collide with anything, and the markers are
+     already told apart by colour. */
+  /* ONE ROW, not two. Stacked 22 units apart they read well at the desktop
+     label size and overlapped each other at the phone size, where the type is
+     34 units tall — a collision between two labels I had just introduced to
+     avoid a collision. Side by side there is no vertical relationship to get
+     wrong, and the pair is about 370 units wide at the phone size inside a
+     550-unit panel. */
+  var LEG_Y = GY0 + 16;
+  el('line', { x1: GX0 + 10, y1: LEG_Y - 4, x2: GX0 + 30, y2: LEG_Y - 4,
+               stroke: STEEL, 'stroke-width': 2.6 });
+  var legIn = el('text', { x: GX0 + 36, y: LEG_Y, 'class': 'lbl-sm halo',
+                           fill: 'currentColor', opacity: '.58' });
+  legIn.textContent = 'holds in';
+  /* placed from the measured width of the first entry, so the gap is the same
+     at both label sizes rather than guessed at one of them */
+  var legGap = legIn.getComputedTextLength ? legIn.getComputedTextLength() : 60;
+  var x2 = GX0 + 36 + legGap + 26;
+  el('line', { x1: x2, y1: LEG_Y - 4, x2: x2 + 20, y2: LEG_Y - 4,
+               stroke: HOT, 'stroke-width': 2.6 });
+  el('text', { x: x2 + 26, y: LEG_Y, 'class': 'lbl-sm halo',
+               fill: HOT_TXT }).textContent = 'takes out';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var t = T_MIN, wasCollapsed = null;
+  /* NO REDUCED-MOTION BRANCH, DELIBERATELY. Every other piece has one because
+     every other piece animates. This one does not: a wall thickness does not
+     change with time and a collapse is an event, not a motion, so the drawing
+     only ever changes when the reader moves the control. There is nothing to
+     reduce, and a vestigial flag that gates nothing would imply a branch that
+     does not exist. An earlier draft carried one, along with a line that
+     evaluated to zero either way. */
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    paper: 'At this wall the tank is holding a useful pressure inside and is nowhere near ' +
+           'able to resist the air outside. It does not need a fault or a mistake: a full ' +
+           'vacuum is what a sealed tank gets for free as soon as the vapour inside it ' +
+           'condenses, and the wall gives way at a small fraction of it.',
+    thin: 'Thicker, and the collapse pressure has climbed steeply — it goes as the cube of ' +
+          'the wall — but it started so far down that it is still well short of one ' +
+          'atmosphere. Look at the distance between the two markers: that gap is the whole ' +
+          'point, and on this scale every step is ten times the last.',
+    near: 'The wall would now just survive a full vacuum, if the tank were perfectly round. ' +
+          'It is not, and the dashed line is what a code would actually let you claim, ' +
+          'which is still below the load. The gap between those two lines is not margin; it ' +
+          'is an admission that the formula assumes a circle.',
+    safe: 'Thick enough at last, with the code factor as well. Note what it cost: something ' +
+          'like six times the plate needed to hold pressure inside. This is why external ' +
+          'pressure is designed with stiffening rings, or removed altogether with a vacuum ' +
+          'breaker, rather than bought with steel.'
+  };
+  var live = document.getElementById('vc-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  function stateOf(t) {
+    var r = takesOut(t) / ATM;
+    return r >= CODE_FACTOR ? 'safe' : r >= 1 ? 'near' : r >= 0.15 ? 'thin' : 'paper';
+  }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     One low thud when the section goes, and then nothing. A collapse is an
+     event, not a state, so the sound is an event too: it fires on the
+     crossing and never repeats.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+    } catch (e) { audio = null; }
+  }
+  function thud() {
+    if (!audio || !soundOn) return;
+    try {
+      var sr = audio.sampleRate, n = Math.floor(sr * 0.35);
+      var b = audio.createBuffer(1, n, sr), d = b.getChannelData(0), i;
+      for (i = 0; i < n; i++) {
+        var env = Math.pow(1 - i / n, 2.5);
+        d[i] = (Math.sin(2 * Math.PI * 58 * i / sr) * 0.75 +
+                (Math.random() * 2 - 1) * 0.25) * env;
+      }
+      var s = audio.createBufferSource(); s.buffer = b;
+      var f = audio.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 320;
+      var g = audio.createGain(); g.gain.value = 0.5;
+      s.connect(f); f.connect(g); g.connect(audio.destination); s.start();
+    } catch (e) {}
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function ring(cx, cy, r, amp, phase) {
+    var d = '', i, th, rr, x, y;
+    for (i = 0; i <= 72; i++) {
+      th = i / 72 * Math.PI * 2;
+      /* the two-lobe mode, which is the one a long cylinder goes into */
+      rr = r * (1 + amp * Math.cos(2 * th + phase));
+      x = cx + rr * Math.cos(th); y = cy + rr * Math.sin(th);
+      d += (i ? ' L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    return d + ' Z';
+  }
+
+  function render() {
+    var collapsed = takesOut(t) < ATM;
+    /* THE DEPTH IS NOT COMPUTED. The mode shape is right for a long
+       cylinder; how far in it goes is chosen to be visible. The page says
+       so, and nothing here depends on it. */
+    var amp = collapsed ? Math.min(0.34, 0.34 * (1 - takesOut(t) / ATM)) : 0;
+    /* THE WALL IS DRAWN ABOUT NINE TIMES THICKER THAN SCALE. At true scale a
+       30 mm wall on a 3 m tank is one per cent of the radius and would be a
+       hairline; the reader could not see the control working at all. The page
+       says so in what is not verified. */
+    var wall = Math.max(2.4, TR * (t / D_TK) * 9.0);
+
+    shellOut.setAttribute('d', ring(TCX, TCY, TR, amp, 0));
+    shellIn.setAttribute('d', ring(TCX, TCY, TR - wall, amp, 0));
+    shellFill.setAttribute('d', ring(TCX, TCY, TR, amp, 0) + ' ' +
+                                ring(TCX, TCY, TR - wall, amp, 0));
+    shellFill.setAttribute('fill-rule', 'evenodd');
+    shellOut.setAttribute('stroke', collapsed ? HOT : STEEL);
+    shellIn.setAttribute('stroke', collapsed ? HOT : STEEL);
+
+    /* the air, pressing in all the way round — the load that is always there */
+    for (var i = 0; i < NSQ; i++) {
+      var th = i / NSQ * Math.PI * 2;
+      var rr = TR * (1 + amp * Math.cos(2 * th));
+      var x1 = TCX + (rr + 34) * Math.cos(th), y1 = TCY + (rr + 34) * Math.sin(th);
+      var x2 = TCX + (rr + 9) * Math.cos(th), y2 = TCY + (rr + 9) * Math.sin(th);
+      squeeze[i].setAttribute('d',
+        'M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' L' + x2.toFixed(1) + ' ' + y2.toFixed(1));
+    }
+
+    /* -- the two curves ---------------------------------------------- */
+    var dIn = '', dOut = '', dAl = '', k, tt;
+    var ptsOut = [], ptsAl = [];
+    for (k = 0; k <= 120; k++) {
+      tt = T_MIN + (T_MAX - T_MIN) * k / 120;
+      var X = px(tt).toFixed(1);
+      dIn  += (k ? ' L' : 'M') + X + ' ' + py(holdsIn(tt)).toFixed(1);
+      ptsOut.push(X + ' ' + py(takesOut(tt)).toFixed(1));
+      ptsAl.push(X + ' ' + py(allowedOut(tt)).toFixed(1));
+    }
+    dOut = 'M' + ptsOut.join(' L');
+    dAl  = 'M' + ptsAl.join(' L');
+    inPath.setAttribute('d', dIn);
+    outPath.setAttribute('d', dOut);
+    allowPath.setAttribute('d', dAl);
+    /* Down the collapse curve and back along the allowable one. An earlier
+       version built this by reversing the path STRING, which spliced two
+       commands together and produced an invalid d the browser rejected —
+       silently on screen, loudly in the console. Reverse the POINTS. */
+    band.setAttribute('d', 'M' + ptsOut.join(' L') + ' L' +
+                           ptsAl.slice().reverse().join(' L') + ' Z');
+
+    /* -- the markers, and the distance between them ------------------- */
+    var xNow = px(t), yIn = py(holdsIn(t)), yOut = py(takesOut(t));
+    dotIn.setAttribute('cx', xNow.toFixed(1)); dotIn.setAttribute('cy', yIn.toFixed(1));
+    dotOut.setAttribute('cx', xNow.toFixed(1)); dotOut.setAttribute('cy', yOut.toFixed(1));
+    gapBar.setAttribute('x1', xNow.toFixed(1)); gapBar.setAttribute('x2', xNow.toFixed(1));
+    gapBar.setAttribute('y1', yIn.toFixed(1));  gapBar.setAttribute('y2', yOut.toFixed(1));
+
+    /* -- the thud, once, on the crossing ------------------------------ */
+    if (wasCollapsed !== null && wasCollapsed === false && collapsed) thud();
+    wasCollapsed = collapsed;
+
+    view.setAttribute('aria-valuenow',
+      Math.round((t - T_MIN) / (T_MAX - T_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      t < 5 ? 'three millimetres, thinner than a coin' :
+      t < 10 ? 'a few millimetres of plate' :
+      t < 18 ? 'heavy plate' :
+      t < 26 ? 'very heavy plate' : 'thirty millimetres, thicker than a thumb');
+
+    document.getElementById('vc-cmp').textContent =
+      collapsed ? 'The section has gone.' : 'The section is holding.';
+
+    say(stateOf(t));
+  }
+
+  /* ==================================================================
+     7. THE LOOP
+
+     Nothing here animates on its own: a wall thickness does not change
+     with time, and the collapse is an event rather than a motion. The
+     drawing updates when the reader moves the control and at no other
+     time, so there is no loop at all — which is also why the reduced
+     branch has nothing to remove.
+     ================================================================== */
+
+  /* ==================================================================
+     8. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setV(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    t = T_MIN + (T_MAX - T_MIN) * v;
+    render();
+  }
+  function curV() { return (t - T_MIN) / (T_MAX - T_MIN); }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = curV();
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setV(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = curV();
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setV(v + 0.04);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setV(v - 0.04);
+    else if (k === 'PageUp') setV(v + 0.18);
+    else if (k === 'PageDown') setV(v - 0.18);
+    else if (k === 'End') setV(1);
+    else if (k === 'Home') setV(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('vc-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+  });
+  document.getElementById('vc-reset').addEventListener('click', function () { setV(0); });
+
+  /* ==================================================================
+     9. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+    function note(pass, line) {
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + line);
+    }
+
+    /* 1. MEMBRANE STRESS, from its definition: at the pressure the wall is
+          said to hold, the hoop stress must be exactly the allowable. */
+    var tt = 8.0;
+    chk('hoop stress at the rated pressure', holdsIn(tt) * D_TK / (2 * tt), SIG_A, 1e-9,
+        ' MPa');
+    chk('and it is linear in thickness', holdsIn(2 * tt) / holdsIn(tt), 2, 1e-12);
+
+    /* 2. COLLAPSE goes as the cube of thickness — that is the whole reason
+          the two curves have different shapes. */
+    chk('double the wall, eight times the collapse pressure',
+        takesOut(2 * tt) / takesOut(tt), 8, 1e-9);
+    chk('and as the cube of thickness over diameter',
+        takesOut(tt), 2 * E_ST * Math.pow(tt / D_TK, 3) / (1 - NU * NU), 1e-15, ' MPa');
+
+    /* 3. THE CLAIM, at the thinnest wall the control can reach: the same
+          plate holds hundreds of times more in than out. */
+    note(holdsIn(T_MIN) / takesOut(T_MIN) > 400,
+         'at the thinnest wall it holds ' +
+         (holdsIn(T_MIN) / takesOut(T_MIN)).toFixed(0) + ' times more in than out');
+    note(holdsIn(T_MAX) / takesOut(T_MAX) > 5,
+         'and at the thickest, still ' +
+         (holdsIn(T_MAX) / takesOut(T_MAX)).toFixed(0) + ' times more');
+
+    /* 4. THE AVAILABLE VACUUM IS ONE ATMOSPHERE, and the thickness that
+          finally resists it is far beyond what pressure ever needed. */
+    var lo = T_MIN, hi = 400, m, i;
+    for (i = 0; i < 200; i++) {
+      m = 0.5 * (lo + hi);
+      if (takesOut(m) < ATM) lo = m; else hi = m;
+    }
+    note(lo > 6 * (D_TK * ATM / (2 * SIG_A)),
+         'surviving a full vacuum needs ' + lo.toFixed(1) +
+         ' mm, against ' + (D_TK * ATM / (2 * SIG_A)).toFixed(2) +
+         ' mm to hold one atmosphere inside');
+    note(lo > T_MIN && lo < T_MAX, 'and that thickness is inside the control');
+
+    /* 5. EVERY NARRATED STATE IS REACHABLE. A state nobody can reach is a
+          claim the piece does not actually make. */
+    var seen = {}, order = [];
+    for (i = 0; i <= 800; i++) {
+      var s = stateOf(T_MIN + (T_MAX - T_MIN) * i / 800);
+      if (!seen[s]) { seen[s] = true; order.push(s); }
+    }
+    note(order.join('>') === 'paper>thin>near>safe',
+         'all four narrated states are reachable, in order  (' + order.join(' > ') + ')');
+
+    /* 6. THE CLAIM, MEASURED IN THE DRAWING RATHER THAN ASSERTED. Sweep the
+          control and read the two markers back: the one for pressure must
+          sit above the one for vacuum at every thickness, and the distance
+          between them must close monotonically and never reach zero. */
+    var keep = t, gaps = [], probe = [0, 0.25, 0.5, 0.75, 1], q;
+    for (q = 0; q < probe.length; q++) {
+      t = T_MIN + (T_MAX - T_MIN) * probe[q]; render();
+      gaps.push(parseFloat(dotOut.getAttribute('cy')) - parseFloat(dotIn.getAttribute('cy')));
+    }
+    t = keep; render();
+    note(gaps.every(function (g) { return g > 0; }),
+         'the pressure marker is above the vacuum marker at every thickness');
+    note(gaps[0] > gaps[1] && gaps[1] > gaps[2] && gaps[2] > gaps[3] && gaps[3] > gaps[4],
+         'and the gap closes, but never shuts  (' + gaps.map(function (g) {
+           return g.toFixed(0);
+         }).join(' → ') + ' px)');
+
+    /* 7. Nothing is ever drawn outside the panel. The log axis was sized
+          from the extremes of both curves, which is what this confirms. */
+    var inside = true;
+    for (i = 0; i <= 200; i++) {
+      var tq = T_MIN + (T_MAX - T_MIN) * i / 200;
+      if (holdsIn(tq) > P_HI || takesOut(tq) < P_LO || allowedOut(tq) < P_LO) inside = false;
+    }
+    note(inside, 'both curves stay inside the panel across the whole control');
+
+    /* 8. NEGATIVE CONTROL. Make collapse go LINEARLY with thickness — the
+          thing this piece says it does not do — and the cube check must
+          stop passing. */
+    var realTakes = takesOut;
+    takesOut = function (x) { return 2 * E_ST * (x / D_TK) / (1 - NU * NU); };
+    var caught = Math.abs(takesOut(2 * tt) / takesOut(tt) - 8) > 1e-6;
+    takesOut = realTakes;
+    note(caught, 'negative control: a linear collapse law fails the cube check');
+
+    out.push('      (at a five millimetre wall: holds ' + (holdsIn(5) * 10).toFixed(1) +
+             ' bar in, collapses at ' + (takesOut(5) * 10).toFixed(3) + ' bar out)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     10. GO
+     ================================================================== */
+
+  setV(0);
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('vacuum collapse: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>

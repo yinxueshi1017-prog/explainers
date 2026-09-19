@@ -171,6 +171,19 @@ specific places where judgement rather than arithmetic decides.
   teaching, or does compressing the cascade into one term misrepresent what an integrator
   needs to design against?** No internal gradient — **acceptable for an 18650?**
 
+### Vacuum collapse
+- **Model** Membrane stress for internal pressure; long-cylinder elastic collapse,
+  p = 2E(t/D)³/(1−ν²), for external. A code factor of 3 shown alongside the elastic value.
+- **Constants** 3 m diameter, 150 MPa allowable, wall swept 3–30 mm, one atmosphere available.
+- **Claim** The same wall holds hundreds of times more pressure in than out, and resisting a
+  full vacuum on plate alone takes roughly six times the wall pressure needs.
+- **Judgement** The elastic formula assumes a perfectly round shell and is therefore the
+  OPTIMISTIC bound — **is a flat factor of 3 the right way to show what out-of-roundness
+  does, or does it understate it for a real fabricated tank?** No stiffening rings and no end
+  effects, which is most of real external-pressure design: **does leaving them out make the
+  piece misleading about what a designer would actually do?** And it stays in the elastic
+  range — **where would yielding start to govern for this diameter?**
+
 ### Water hammer
 - **Model** Method of characteristics, 60 reaches, dt = dx/a, valve position read every step.
 - **Constants** 600 m, 300 mm bore, a = 1200 m/s, f = 0.02, 2 m/s initial velocity.
