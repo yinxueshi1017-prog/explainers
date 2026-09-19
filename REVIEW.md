@@ -123,13 +123,24 @@ specific places where judgement rather than arithmetic decides.
   does that overstate the damage on a large structure?**
 
 ### Hydrogen embrittlement
-- **Model** Largely qualitative: hydrogen accumulating at the first engaged thread under
-  load, with nothing visible outside.
-- **Claim** A plated bolt passes every external inspection right up to failure.
-- **Judgement** This is the oldest piece and the most narrative. **Is the accumulation at
-  the first engaged thread the right place to draw it**, and is the timescale implied by
-  the animation misleading? The torque-mark claim that used to be here was cut as
-  unverified; **is anything else in it in the same category?**
+- **Model** Largely qualitative: hydrogen generated at the surface during plating and
+  diffusing inward, accumulating at the first engaged thread under load, with nothing
+  visible outside. Baking is represented by a single retained fraction.
+- **Constants** ISO metric coarse proportions; ASTM B850 and F1940 cited for baking
+  practice. A baked part is built holding 0.14 of the original charge.
+- **Claim** A plated bolt passes every external inspection right up to failure, and baking
+  leaves it visibly emptier but not empty.
+- **Judgement** **The 0.14 is a display value, not a measurement.** It was chosen to sit
+  under the bound below which the animation cannot express a fracture at all, so that the
+  piece cannot kill a bolt the oven saved. There is no diffusivity and no egress-against-time
+  model anywhere in the file. So: **is a single retained fraction an honest way to draw
+  baking at all**, or does compressing an egress curve into one number misrepresent what a
+  bake buys? **What fraction would a practitioner recognise** coming off a four-hour cycle
+  on a high-strength fastener &mdash; and does it depend enough on section and plating
+  chemistry that a single figure is indefensible? Separately: **is the first engaged thread
+  the right place to draw the accumulation**, and is the timescale implied by the animation
+  misleading? The torque-mark claim that used to be here was cut as unverified; **is anything
+  else in it in the same category?**
 
 ### Resonance
 - **Model** Single degree of freedom, viscous damping, harmonic excitation of constant

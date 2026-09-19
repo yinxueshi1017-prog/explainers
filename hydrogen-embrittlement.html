@@ -5558,7 +5558,7 @@ window.HX3D = { LOOK: LOOK, R3D: R3D, BOLT: BOLT, SIM: SIM,
 <div class="hx-page"><div class="pgwrap">
   <h2>What is not verified</h2>
   <p>
-    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim. The first list is the part that would change how you read the result. The second is scope &mdash; true, worth saying, and not load-bearing.
   </p>
   <ul>
     <li><strong>No engineer has reviewed the physics.</strong> The proportions were checked
@@ -5566,6 +5566,20 @@ window.HX3D = { LOOK: LOOK, R3D: R3D, BOLT: BOLT, SIM: SIM,
       and against ASTM B850 and F1940 for baking practice, and the joint mechanics hold up.
       But that check was the author's own. Before this is relied on as authority, it wants a
       metallurgist's eye.</li>
+    <li><strong>The baked bolt keeps a number I chose, not a number I measured.</strong>
+      A baked part is built holding fourteen per cent of the original charge. That is not a
+      residual from a diffusion calculation &mdash; there is no diffusivity in this file and
+      no model of egress against time. It is a display value, picked to sit under the bound
+      below which the demo is arithmetically unable to show a fracture, so that the piece
+      cannot kill a bolt the oven saved. ASTM B850 and F1940 are cited for baking practice,
+      not for that fraction. If you want to know what a real bake leaves behind, this page
+      is not evidence, and quoting the figure back as though it were would be worse than
+      quoting nothing.</li>
+  </ul>
+
+  <p class="note"><strong>Scope, for completeness.</strong> True of the model, and none of it changes the answer above.</p>
+
+  <ul>
     <li><strong>The sound path is measured on one browser engine</strong> (Chromium). The
       audio is opt-in and the piece is complete without it.</li>
     <li><strong>The frame budget is measured in a software rasteriser</strong>, which is

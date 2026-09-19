@@ -146,7 +146,7 @@
     </div>
     <div class="rail">
       <div><b>1&nbsp;file</b>no libraries, no build step, no network</div>
-      <div><b>297.0&nbsp;KB</b>of a 500&nbsp;KB budget</div>
+      <div><b>298.0&nbsp;KB</b>of a 500&nbsp;KB budget</div>
       <div><b>155</b>assertions in the acceptance gate</div>
     </div>
   </header>
@@ -301,7 +301,7 @@
         <tr><td>Dependencies</td><td>none</td></tr>
         <tr><td>Network requests</td><td>zero</td></tr>
         <tr><td>Rendering</td><td>software 3D &rarr; SVG</td></tr>
-        <tr><td>Size</td><td>297.0 KB</td></tr>
+        <tr><td>Size</td><td>298.0 KB</td></tr>
         <tr><td>Responsive</td><td>320&ndash;2560 px</td></tr>
         <tr><td>Reduced motion</td><td>respected, payoff still reachable</td></tr>
         <tr><td>Assistive tech</td><td>the drawing is an input, not a picture</td></tr>
@@ -319,16 +319,21 @@
   <section class="row">
     <div class="col">
       <h2>What is not verified</h2>
-      <p>Stated plainly, because a piece whose value is trustworthiness should not overclaim.</p>
+      <p>Stated plainly, because a piece whose value is trustworthiness should not overclaim. The first list is the part that would change how you read the result. The second is scope &mdash; true, worth saying, and not load-bearing.</p>
       <ul>
         <li><strong>An audit, which is not a review.</strong> <code>audit.py</code> in
         <a href="https://github.com/yinxueshi1017-prog/explainers">the source</a> re-derives every piece's central claim from published
         references and re-does each closed form numerically, then corrupts a constant at a
         time to prove it can still fail. It checks the arithmetic and the constants. It
         cannot tell you the relation is the right one for your problem.</li>
-      <li><strong>No human engineer has reviewed the physics.</strong> Proportions were checked
+        <li><strong>No human engineer has reviewed the physics.</strong> Proportions were checked
         against ISO metric coarse practice and the joint mechanics hold up, but that check was mine.
         Before this ships as authority, it wants a metallurgist's eye.</li>
+      </ul>
+
+      <p><strong>Scope, for completeness.</strong> True of the model, and none of it changes the answer above.</p>
+
+      <ul>
         <li><strong>The sound path is measured on one browser engine.</strong> Chromium here; the
         audio is opt-in and the piece is complete without it.</li>
         <li><strong>Frame budget is measured in a software rasteriser</strong>, which is slower than
