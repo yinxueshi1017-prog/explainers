@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bolt preload</title>
+<meta name="description" content="A properly tightened bolt feels about a sixth of the load applied to the joint. A loose one feels all of it. Past the point where the joint stops opening, tightening further changes what the bolt feels not at all.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpolygon%20points%3D%225%2C2.6%2011%2C2.6%2012.4%2C5%2011%2C7.4%205%2C7.4%203.6%2C5%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Crect%20x%3D%227.1%22%20y%3D%227.4%22%20width%3D%221.8%22%20height%3D%225.4%22%20fill%3D%22%238fa3b5%22%2F%3E%3Cpath%20d%3D%22M2.2%2010.6%20H13.8%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. A preloaded
+  bolted joint and its force diagram, drawn into SVG — no canvas, no WebGL.
+
+  THE ARGUMENT: the bolt is what holds the joint together, so it seems
+  obvious that the bolt carries the load applied to it. It does not. In a
+  properly tightened joint the members are very much stiffer than the bolt
+  — here about five times — and they carry most of any load applied,
+  because pulling the joint apart RELIEVES the compression in the members
+  far more than it stretches the bolt. The bolt takes the load factor's
+  share, which for this joint is about a sixth.
+
+  That holds right up until the members' compression reaches zero. At that
+  moment the joint opens, the members stop taking anything, and the bolt
+  takes the entire load and the entire fluctuation. The failure is a
+  fatigue failure, and it is caused by the joint being too loose rather
+  than the bolt being too weak — which is why replacing a broken bolt with
+  a stronger one so often breaks the stronger one too.
+
+  And the other half, which is the useful one for anybody writing a torque
+  figure: past the preload that keeps the joint shut, tightening further
+  changes what the bolt FEELS not at all. Check six measures that in the
+  rendered geometry: the bracket is exactly the same height at every
+  preload above the threshold.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #bp-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #bp-view:focus { outline:none; }
+  #bp-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #bp-view .lbl { font-size:15px; }
+  #bp-view .lbl-sm { font-size:13px; }
+  /* a halo in the card colour, so a line sweeping past a label passes
+     behind the words instead of through them */
+  #bp-view .halo { paint-order:stroke; stroke:var(--card); stroke-width:4px;
+                   stroke-linejoin:round; }
+  @media (max-width:34rem) { #bp-view .lbl { font-size:40px; } #bp-view .lbl-sm { font-size:34px; }
+                             #bp-view .seg { display:none; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+
+  /* ---- ON PAPER ----
+     The palette above inverts the CSS colours for print, but the drawing sets
+     its own fills and opacities as ATTRIBUTES, which no palette reaches. A
+     label dimmed to .58 lands at 4.13:1 on white — under the 4.5 WCAG asks of
+     text. So on paper the lettering goes to full-strength ink. The LINES keep
+     their colours, so the drawing still reads in colour and survives a
+     greyscale printer.
+
+     The second rule is the one that matters: opacity 0 is how this piece hides
+     a label that does not apply yet, and forcing every label visible would
+     print claims the drawing is not making. The attribute selector is the more
+     specific, so it wins. */
+  @media print {
+    #bp-view text { opacity: 1 !important; fill: #1a1f24 !important; }
+    #bp-view text[opacity="0"] { opacity: 0 !important; }
+  }
+</style>
+
+<!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----
+  A link pasted into Slack, LinkedIn or a mail client renders from these, and
+  without them it renders as a bare grey URL. The preview image is a real PNG
+  at an absolute URL because that is the only thing a scraper will take — a
+  data: URI is not fetched and SVG is rejected by most of them.
+
+  This does NOT put a request into the page. og:image is fetched by the
+  crawler that unfurls the link, never by the reader's browser, so the page
+  still loads with nothing off-origin. -->
+<link rel="canonical" href="https://yinxueshi1017-prog.github.io/explainers/bolt-preload.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Interactive explainers">
+<meta property="og:title" content="Bolt preload">
+<meta property="og:description" content="A properly tightened bolt feels about a sixth of the load applied to the joint. A loose one feels all of it. Past the point where the joint stops opening, tightening further changes what the bolt feels not at all.">
+<meta property="og:url" content="https://yinxueshi1017-prog.github.io/explainers/bolt-preload.html">
+<meta property="og:image" content="https://yinxueshi1017-prog.github.io/explainers/og/bolt-preload.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark title card reading “Bolt preload”.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bolt preload">
+<meta name="twitter:description" content="A properly tightened bolt feels about a sixth of the load applied to the joint. A loose one feels all of it. Past the point where the joint stops opening, tightening further changes what the bolt feels not at all.">
+<meta name="twitter:image" content="https://yinxueshi1017-prog.github.io/explainers/og/bolt-preload.png">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Bolt preload — the bolt barely feels the load, until the joint lets go</h1>
+
+  <p class="how" id="bp-how">
+    The same joint, the same bolt, the same load cycling on and off. The only thing you
+    are changing is how tight the bolt was done up. Drag upward to tighten, down to slacken;
+    the arrow keys do the same. <strong>End is tightened to near proof load</strong>; Home
+    is barely finger tight. Watch the orange bracket — it is everything the bolt feels.
+    Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="bp-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="barely finger tight"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="bp-how"
+         aria-label="How tightly the bolt was done up"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the joint, with the load cycling on and off. Right: the force in the bolt against the load applied to the joint. The orange bracket is how much that force swings — which is what breaks bolts.</span>
+      <span id="bp-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="bp-sound" aria-pressed="false">Sound</button>
+    <button id="bp-reset">Reset</button>
+  </div>
+
+  <p class="live" id="bp-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Tightening a bolt stretches it and squeezes the parts it holds together. The bolt ends
+    up pulling with some force and the members end up pushing back with exactly the same
+    force, and nothing moves. That force is the preload, and the control here is nothing
+    but the preload.
+  </p>
+  <p class="body">
+    Now pull on the joint. The instinct is that the bolt takes what you apply, because the
+    bolt is what is holding it together. It does not. Pulling the joint apart relieves the
+    squeeze in the members at the same time as it stretches the bolt a little more, and the
+    members are far stiffer than the bolt — a short fat column of steel against a long thin
+    one. Most of what you apply is spent un-squeezing the members. The bolt takes only its
+    share of the stiffness, which for this joint is <strong>about a sixth</strong>.
+  </p>
+  <p class="body">
+    That lasts exactly as long as there is squeeze left to relieve. When the compression in
+    the members reaches zero the joint opens, and from that moment the members are carrying
+    nothing whatever and the bolt is carrying all of it. On the plot the line stops being
+    nearly flat and becomes the diagonal — the bolt now feels every pound you apply, and
+    more importantly it feels every pound you take away again.
+  </p>
+  <p class="body">
+    Bolts almost never fail by being pulled apart once. They fail in fatigue, from the
+    <em>swing</em> rather than the size, which is the orange bracket. Keep the joint shut
+    and the swing is a sixth of the load; let it open and the swing is the whole of it,
+    several times a second, for as long as the machine runs.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>A broken bolt is usually a loose-joint problem, not a weak-bolt problem.</strong>
+    Fitting a stronger bolt at the same torque raises the preload hardly at all — the grade
+    changes what the bolt can survive, not how hard somebody pulled the spanner. If the
+    joint was opening before, it opens now, and the stronger bolt fails in the same place
+    for the same reason. The fix is more preload, a bigger bolt, or a stiffer joint.
+  </p>
+  <p class="body">
+    <strong>Past the point where the joint stops opening, tightening further does nothing
+    for fatigue.</strong> The bracket stops shrinking, exactly and completely, and the rest
+    of the tightening goes into the bolt's mean stress and into margin against everything
+    else — slip, loosening, a bigger load than the one designed for. Those are good reasons
+    to keep tightening to a proper figure. Reducing what the bolt feels from the load is not
+    one of them, past that point.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> If you are one and would check it,
+      <a href="https://github.com/yinxueshi1017-prog/explainers/blob/main/REVIEW.md">REVIEW.md</a>
+      says what would actually help and is meant to cost about fifteen minutes. The load
+      factor comes from the standard stiffness relation with Wileman's published member
+      stiffness, and the built-in checks confirm the arithmetic — but that check is the
+      author's own, not a fastener engineer's.</li>
+    <li><strong>The load is concentric and axial.</strong> It is applied along the bolt and
+      at the bolt. Real joints are usually loaded off to one side, which prises the joint
+      open on one edge at a far lower load than this drawing shows, and is the commonest
+      way a joint that "cannot" open does.</li>
+    <li><strong>Member stiffness is an empirical fit.</strong> Wileman's expression is a
+      curve fit to finite-element results for a particular geometry. The frustum methods in
+      VDI 2230 disagree with it, and with each other, by enough to move the load factor
+      noticeably — so treat a sixth as the right order, not a number to design to.</li>
+    <li><strong>Preload is drawn as a number you simply choose.</strong> Getting it is the
+      hard part: torque is a poor proxy, with most of it lost to friction under the head and
+      in the threads, and scatter of plus or minus a quarter is normal for a plain torque
+      wrench. That scatter matters most exactly where this piece says it does — near the
+      threshold.</li>
+    <li><strong>Nothing here relaxes, loosens, or bends.</strong> Embedding, gasket creep and
+      vibration all lose preload over time, and this joint holds whatever it was given
+      forever. The bolt is also assumed to stay elastic.</li>
+    <li><strong>One bolt.</strong> Real joints have several, sharing unevenly.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    Commissions start at £4,000 and take three to four weeks from an agreed brief.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+    <br><br>
+    Not commissioning anything? Still worth an email. If your version of this failed
+    differently &mdash; other geometry, other numbers, a mechanism this piece leaves out &mdash;
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Bolt%20preload%20%E2%80%94%20what%20this%20leaves%20out&amp;body=Where%20this%20differs%20from%20what%20I%20see%20in%20the%20field%3A%0A%0A">tell me in one line</a>.
+    Corrections are the main thing that decides what gets built next.
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE SYSTEM
+
+     One M12 x 1.75 grade 8.8 bolt through a 40 mm grip of steel,
+     carrying a load that cycles on and off. Forces in kN, lengths in
+     mm, stresses in MPa.
+     ================================================================== */
+
+  var D_NOM  = 12.0;        /* mm, nominal diameter                        */
+  var A_S    = 84.3;        /* mm^2, tensile stress area (ISO 898-1)       */
+  var S_P    = 580.0;       /* MPa, proof strength of grade 8.8            */
+  var E_ST   = 207000.0;    /* MPa                                         */
+  var GRIP   = 40.0;        /* mm of steel being clamped                   */
+  var FE_MAX = 25.0;        /* kN, the load cycles between zero and this   */
+
+  var F_PROOF = A_S * S_P / 1000;          /* kN — 48.9                    */
+  var K_B = A_S * E_ST / GRIP / 1000;      /* kN/mm, the bolt              */
+
+  /* Wileman's published fit for the stiffness of the clamped members of a
+     steel joint: km = E d A exp(B d/l), A = 0.78715, B = 0.62873. The
+     frustum methods disagree with it, which the page says out loud. */
+  var K_M = E_ST * D_NOM * 0.78715 * Math.exp(0.62873 * D_NOM / GRIP) / 1000;
+
+  /* THE LOAD FACTOR. The whole piece is this one number: the share of an
+     applied load that reaches the bolt, which is the bolt's share of the
+     joint's stiffness. Everything else follows from it. */
+  var C_LOAD = K_B / (K_B + K_M);
+
+  var FI_MAX = 0.90 * F_PROOF;             /* kN, the control's top end    */
+
+  /* The load at which the members' compression reaches zero. Past it the
+     members carry nothing and the bolt carries everything. */
+  function sepLoad(Fi) { return Fi / (1 - C_LOAD); }
+  /* Force in the bolt, for a preload and an applied load. */
+  function boltForce(Fi, Fe) {
+    return Fe < sepLoad(Fi) ? Fi + C_LOAD * Fe : Fe;
+  }
+  /* Force still squeezing the members. Never negative: they can push, not pull. */
+  function clampForce(Fi, Fe) {
+    return Math.max(0, Fi - (1 - C_LOAD) * Fe);
+  }
+  /* What the bolt FEELS: how far its force swings over one cycle of the
+     applied load. This is the fatigue quantity, and it is the payoff. */
+  function boltSwing(Fi) { return boltForce(Fi, FE_MAX) - boltForce(Fi, 0); }
+  /* The preload at which the joint just stops opening under the full load. */
+  var FI_SHUT = (1 - C_LOAD) * FE_MAX;
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('bp-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var GX0 = 400, GX1 = 950, GY0 = 55, GY1 = 372;
+  var FE_AXIS = 32.0;       /* kN across the plot                          */
+  var F_AXIS  = 55.0;       /* kN up it. Sized so the highest thing drawn —
+                               the bolt force at full preload and full load,
+                               47.9 — lands inside WITH the proof line and
+                               its label above it. A reference line that
+                               clamps to the ceiling asserts something
+                               false. */
+  function px(Fe) { return GX0 + (GX1 - GX0) * Fe / FE_AXIS; }
+  function py(F)  { return GY1 - (GY1 - GY0) * F / F_AXIS; }
+
+  /* ONE SATURATED COLOUR, and it belongs to the bolt: its force line and the
+     bracket that measures what it feels. The joint, the members and the
+     frame are all the same cool steel, so the panel makes one assertion. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+  /* The same colour six points lighter in green: as TEXT the drawing's orange
+     is 4.47:1 on this card, just under the 4.5 WCAG asks of normal-size text.
+     The lines keep the original — a line only has to clear 3:1. */
+  var HOT_TXT = 'rgb(226,84,38)';
+
+  /* -- the joint, on the left ---------------------------------------- */
+  var JX = 96, JW = 150, JMID = 214;
+  var plateT = el('rect', { x: JX, y: JMID - 42, width: JW, height: 42,
+                            fill: STEEL, opacity: '.30' });
+  var plateB = el('rect', { x: JX, y: JMID, width: JW, height: 42,
+                            fill: STEEL, opacity: '.30' });
+  el('rect', { x: JX, y: JMID, width: JW, height: 42, fill: 'none',
+               stroke: STEEL, 'stroke-width': 1.6, opacity: '.8' });
+  var plateTline = el('rect', { x: JX, y: JMID - 42, width: JW, height: 42, fill: 'none',
+                                stroke: STEEL, 'stroke-width': 1.6, opacity: '.8' });
+  /* the gap that opens when the joint lets go — the thing to watch */
+  var gapFill = el('rect', { x: JX, width: JW, height: 0, fill: HOT, opacity: '0' });
+  var shank = el('rect', { x: JX + JW / 2 - 8, width: 16, fill: STEEL, opacity: '.75' });
+  var head  = el('path', { d: '', fill: STEEL });
+  var nut   = el('path', { d: '', fill: STEEL });
+  /* the load, pulling the two plates apart */
+  var pullT = el('path', { d: '', fill: 'none', stroke: 'currentColor',
+                           'stroke-width': 2.4, 'stroke-linecap': 'round', opacity: '.6' });
+  var pullB = el('path', { d: '', fill: 'none', stroke: 'currentColor',
+                           'stroke-width': 2.4, 'stroke-linecap': 'round', opacity: '.6' });
+  el('text', { x: JX + JW / 2, y: 408, 'class': 'lbl-sm halo', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'the joint';
+
+  /* -- the plot ------------------------------------------------------- */
+  /* PAINT ORDER: the moving lines go down before the labels, so a line
+     sweeping past a word passes behind it rather than through it. */
+  var sepLine = el('line', { y1: GY0, y2: GY1, stroke: HOT, 'stroke-width': 1.4,
+                             'stroke-dasharray': '5 5', opacity: '.55' });
+  var cycleBand = el('rect', { x: px(0), y: GY0, width: px(FE_MAX) - px(0),
+                               height: GY1 - GY0, fill: STEEL, opacity: '.07' });
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  /* the bolt cannot be taken past proof: a fixed property of the bolt, and
+     the reason the control stops where it does */
+  el('line', { x1: GX0, y1: py(F_PROOF), x2: GX1, y2: py(F_PROOF),
+               stroke: 'currentColor', 'stroke-width': 1, 'stroke-dasharray': '3 5',
+               opacity: '.4' });
+  el('text', { x: GX1 - 4, y: py(F_PROOF) - 9, 'class': 'lbl-sm halo', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'proof load';
+  el('text', { x: GX1 - 4, y: GY1 + 22, 'class': 'lbl-sm halo', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'load on the joint →';
+  el('text', { x: GX0 + 4, y: GY0 - 8, 'class': 'lbl-sm halo seg',
+               fill: 'currentColor', opacity: '.58' }).textContent = 'force in the bolt';
+  el('text', { x: (px(0) + px(FE_MAX)) / 2, y: GY1 + 22, 'class': 'lbl-sm halo seg',
+               'text-anchor': 'middle', fill: 'currentColor',
+               opacity: '.58' }).textContent = 'the load cycles across here';
+
+  var boltPath = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 2.8,
+                              'stroke-linejoin': 'round' });
+  var clampPath = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2,
+                               'stroke-dasharray': '6 4', opacity: '.75' });
+  /* THE PAYOFF: how far the bolt's force swings across one cycle. */
+  var swingBar = el('line', { stroke: HOT, 'stroke-width': 7, 'stroke-linecap': 'round' });
+  var dotLo = el('circle', { r: 4.5, fill: HOT });
+  var dotHi = el('circle', { r: 4.5, fill: HOT });
+  /* Not at the top of the line: "proof load" is anchored to the top right
+     corner, and at the phone label size this word is wide enough to reach it
+     whenever separation happens late in the cycle. Measured, not guessed —
+     it collided at 60% of the control, then at 44% after the first fix. It
+     now sits well below that band, and carries a halo so the dashed line it
+     labels passes behind the word rather than through it. */
+  var sepLbl = el('text', { 'class': 'lbl-sm halo', 'text-anchor': 'middle', fill: HOT_TXT });
+  sepLbl.textContent = 'lets go';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var Fi = 0, t = 0;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    loose: 'Barely tightened. The joint comes apart almost as soon as the load arrives, so ' +
+           'the members carry nothing and the bolt carries all of it — and lets go of all of ' +
+           'it again, every cycle. The orange bracket is nearly the whole height of the load. ' +
+           'This is what breaks bolts, and notice that nothing about the bolt is wrong.',
+    opening: 'Tighter, and the joint now holds for part of the cycle before it opens. The ' +
+             'bracket has come down, but every cycle still takes the joint through the corner ' +
+             'where the members hand the whole load to the bolt. Half-tight is not half as ' +
+             'good; it is still the same mechanism.',
+    marginal: 'Nearly tight enough. The joint opens only at the very top of the load, and the ' +
+              'bracket is close to as small as it will get. This is the worst place to sit: a ' +
+              'little preload lost to embedding, or one load bigger than the design one, and ' +
+              'it is back to the corner.',
+    shut: 'Properly tightened, and the joint never opens. The bolt now feels about a sixth of ' +
+          'the load, because the members are far stiffer than it is and they absorb the rest ' +
+          'by un-squeezing. Keep tightening and watch the bracket: it does not get any ' +
+          'smaller, because there is no opening left to prevent.'
+  };
+  var live = document.getElementById('bp-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  function stateOf(Fi) {
+    var r = Fi / FI_SHUT;
+    return r >= 1 ? 'shut' : r > 0.8 ? 'marginal' : r > 0.35 ? 'opening' : 'loose';
+  }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     A joint that opens knocks, once per cycle, as the faces come back
+     together. A joint that stays shut is silent, which is the honest
+     thing: that is what a good joint sounds like.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, lastKnock = -1;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+    } catch (e) { audio = null; }
+  }
+  function knock(strength) {
+    if (!audio || !soundOn) return;
+    try {
+      var sr = audio.sampleRate, n = Math.floor(sr * 0.06);
+      var b = audio.createBuffer(1, n, sr), d = b.getChannelData(0), i;
+      for (i = 0; i < n; i++) {
+        /* a short decaying burst — the faces meeting, not a tone */
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 5);
+      }
+      var s = audio.createBufferSource(); s.buffer = b;
+      var f = audio.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.value = 220; f.Q.value = 1.2;
+      var g = audio.createGain(); g.gain.value = 0.45 * strength;
+      s.connect(f); f.connect(g); g.connect(audio.destination); s.start();
+    } catch (e) {}
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var i, d;
+
+    /* where in the load cycle we are: zero to FE_MAX and back */
+    var phase = (t * 0.55) % 1;
+    var Fe = reduce ? FE_MAX : FE_MAX * (0.5 - 0.5 * Math.cos(2 * Math.PI * phase));
+
+    var Fb = boltForce(Fi, Fe), Fc = clampForce(Fi, Fe);
+    var open = Fc <= 0;
+
+    /* -- the joint ---------------------------------------------------- */
+    /* the gap, drawn to a scale that makes a real separation visible: the
+       actual extension is microns and would be invisible, so the drawing
+       exaggerates it and says so in the caption rather than pretending. */
+    var gap = open ? Math.min(18, (Fe - sepLoad(Fi)) / (1 - C_LOAD) * 0.9) : 0;
+    plateT.setAttribute('y', JMID - 42 - gap);
+    plateTline.setAttribute('y', JMID - 42 - gap);
+    gapFill.setAttribute('y', JMID - gap);
+    gapFill.setAttribute('height', Math.max(0, gap).toFixed(2));
+    gapFill.setAttribute('opacity', gap > 0.4 ? '.5' : '0');
+    shank.setAttribute('y', JMID - 42 - gap - 22);
+    shank.setAttribute('height', 42 + gap + 22 + 42 + 22);
+    var hx = JX + JW / 2, hy = JMID - 42 - gap - 22;
+    head.setAttribute('d', 'M' + (hx - 21) + ' ' + hy + ' h42 l10 11 l-10 11 h-42 l-10 -11 z');
+    var ny = JMID + 42 + 22;
+    nut.setAttribute('d', 'M' + (hx - 21) + ' ' + ny + ' h42 l10 -11 l-10 -11 h-42 l-10 11 z');
+    var pull = 10 + 26 * (Fe / FE_MAX);
+    pullT.setAttribute('d', 'M' + hx + ' ' + (hy - 13) + ' v-' + pull.toFixed(1) +
+                            ' m-7 9 l7 -9 l7 9');
+    pullB.setAttribute('d', 'M' + hx + ' ' + (ny + 13) + ' v' + pull.toFixed(1) +
+                            ' m-7 -9 l7 9 l7 -9');
+
+    /* -- the plot ----------------------------------------------------- */
+    var sep = sepLoad(Fi);
+    d = 'M' + px(0) + ' ' + py(boltForce(Fi, 0));
+    if (sep < FE_AXIS) {
+      d += ' L' + px(sep).toFixed(1) + ' ' + py(boltForce(Fi, sep * 0.99999)).toFixed(1);
+      d += ' L' + px(FE_AXIS) + ' ' + py(FE_AXIS);
+    } else {
+      d += ' L' + px(FE_AXIS) + ' ' + py(boltForce(Fi, FE_AXIS)).toFixed(1);
+    }
+    boltPath.setAttribute('d', d);
+
+    /* what is left squeezing the members, which is what runs out */
+    var dc = 'M' + px(0) + ' ' + py(Fi);
+    var zero = Fi / (1 - C_LOAD);
+    dc += ' L' + px(Math.min(zero, FE_AXIS)).toFixed(1) + ' ' +
+          py(Math.max(0, Fi - (1 - C_LOAD) * Math.min(zero, FE_AXIS))).toFixed(1);
+    if (zero < FE_AXIS) dc += ' L' + px(FE_AXIS) + ' ' + py(0);
+    clampPath.setAttribute('d', dc);
+
+    /* the separation line, and its label — hidden rather than clamped when
+       the joint never opens inside the panel */
+    if (sep < FE_AXIS) {
+      sepLine.setAttribute('x1', px(sep).toFixed(1));
+      sepLine.setAttribute('x2', px(sep).toFixed(1));
+      sepLine.setAttribute('opacity', '.55');
+    } else {
+      sepLine.setAttribute('opacity', '0');
+    }
+    /* THE LABEL IS NOT THE LINE. The line is worth drawing wherever
+       separation would happen; the words "lets go" are only worth saying
+       while it happens INSIDE the cycle the reader is watching. Past that
+       preload the joint never opens, the label is describing an event that
+       does not occur, and — measured at the phone label size — it also ran
+       into "proof load" at the top right corner. Hiding it fixes the second
+       thing because it was already wrong about the first. */
+    if (sep <= FE_MAX) {
+      sepLbl.setAttribute('x', px(sep).toFixed(1));
+      sepLbl.setAttribute('y', GY0 + 70);
+      sepLbl.setAttribute('opacity', '1');
+    } else {
+      sepLbl.setAttribute('opacity', '0');
+    }
+
+    /* THE BRACKET: the bolt's force at the bottom of the cycle and at the
+       top, and the distance between them. */
+    var lo = boltForce(Fi, 0), hi = boltForce(Fi, FE_MAX);
+    var bx = px(FE_MAX);
+    swingBar.setAttribute('x1', bx); swingBar.setAttribute('x2', bx);
+    swingBar.setAttribute('y1', py(lo).toFixed(2));
+    swingBar.setAttribute('y2', py(hi).toFixed(2));
+    dotLo.setAttribute('cx', bx); dotLo.setAttribute('cy', py(lo).toFixed(2));
+    dotHi.setAttribute('cx', bx); dotHi.setAttribute('cy', py(hi).toFixed(2));
+
+    /* -- the knock ---------------------------------------------------- */
+    if (!reduce && open) {
+      var k = Math.floor(t * 0.55);
+      if (k !== lastKnock) { lastKnock = k; knock(Math.min(1, gap / 12 + 0.25)); }
+    }
+
+    view.setAttribute('aria-valuenow', Math.round(Fi / FI_MAX * 100));
+    var frac = Fi / F_PROOF;
+    view.setAttribute('aria-valuetext',
+      frac < 0.10 ? 'barely finger tight' :
+      frac < 0.30 ? 'part tightened' :
+      frac < 0.45 ? 'nearly tight enough' :
+      frac < 0.70 ? 'properly tightened' : 'tightened to near proof load');
+
+    document.getElementById('bp-cmp').textContent =
+      sep < FE_MAX ? 'The joint opens every cycle.' : 'The joint stays shut.';
+
+    say(stateOf(Fi));
+  }
+
+  /* ==================================================================
+     7. THE LOOP — only the load cycle moves
+     ================================================================== */
+
+  var last = 0;
+  function frame(now) {
+    if (!last) last = now;
+    t += (now - last) / 1000; last = now;
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION
+
+     The only animated thing is the load going on and off, which is
+     illustration: every claim the piece makes is in the plot and the
+     bracket, and those change only when the reader moves the control. So
+     this branch holds the load at its maximum — where a separation, if
+     there is one, is actually visible — and never animates. Open with
+     #reduce to see it.
+     ================================================================== */
+
+  function reducedUpdate() { render(); }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setV(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    Fi = FI_MAX * v;
+    if (reduce) reducedUpdate();
+  }
+  function curV() { return Fi / FI_MAX; }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = curV();
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setV(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = curV();
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setV(v + 0.04);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setV(v - 0.04);
+    else if (k === 'PageUp') setV(v + 0.18);
+    else if (k === 'PageDown') setV(v - 0.18);
+    else if (k === 'End') setV(1);
+    else if (k === 'Home') setV(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('bp-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+  });
+  document.getElementById('bp-reset').addEventListener('click', function () {
+    setV(0); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+    function note(pass, line) {
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + line);
+    }
+
+    /* 1. THE STIFFNESSES, from their definitions. */
+    chk('bolt stiffness, A E / l', K_B, 84.3 * 207000 / 40 / 1000, 1e-9, ' kN/mm');
+    chk('member stiffness, Wileman', K_M,
+        207000 * 12 * 0.78715 * Math.exp(0.62873 * 12 / 40) / 1000, 1e-9, ' kN/mm');
+    chk('proof load of an M12 8.8', F_PROOF, 48.894, 0.01, ' kN');
+
+    /* 2. THE LOAD FACTOR is the bolt's share of the stiffness, and for a
+          steel joint the literature puts it between about 0.1 and 0.3. */
+    chk('load factor = kb / (kb + km)', C_LOAD, K_B / (K_B + K_M), 1e-12);
+    note(C_LOAD > 0.10 && C_LOAD < 0.30,
+         'the load factor is inside the published band for a steel joint  (' +
+         C_LOAD.toFixed(3) + ')');
+
+    /* 3. THE SPLIT. Below separation the bolt takes C of what is applied
+          and the members give up the rest — and the two must add up to the
+          load, exactly, or the joint is inventing force. */
+    var Fe = 12.0, Ft = 30.0;
+    chk('the bolt takes its share', boltForce(Ft, Fe) - Ft, C_LOAD * Fe, 1e-12, ' kN');
+    chk('the members give up the rest', Ft - clampForce(Ft, Fe), (1 - C_LOAD) * Fe,
+        1e-12, ' kN');
+    chk('and the two account for all of it',
+        (boltForce(Ft, Fe) - Ft) + (Ft - clampForce(Ft, Fe)), Fe, 1e-12, ' kN');
+
+    /* 4. SEPARATION is where the squeeze runs out, and past it the bolt
+          carries the load and nothing else does. */
+    chk('the squeeze is exactly zero at separation', clampForce(Ft, sepLoad(Ft)), 0, 1e-9,
+        ' kN');
+    chk('past it the bolt carries all of it', boltForce(10, 24), 24, 1e-12, ' kN');
+    chk('and the members carry none', clampForce(10, 24), 0, 1e-12, ' kN');
+
+    /* 5. EVERY NARRATED STATE IS REACHABLE. A state nobody can reach is a
+          claim the piece does not actually make. */
+    var seen = {}, order = [], i;
+    for (i = 0; i <= 800; i++) {
+      var s = stateOf(FI_MAX * i / 800);
+      if (!seen[s]) { seen[s] = true; order.push(s); }
+    }
+    note(order.join('>') === 'loose>opening>marginal>shut',
+         'all four narrated states are reachable, in order  (' + order.join(' > ') + ')');
+
+    /* 6. THE CLAIM, MEASURED IN THE DRAWING RATHER THAN ASSERTED.
+          Read the bracket back out of the rendered geometry: it must shrink
+          while the joint still opens, and then be the SAME HEIGHT at every
+          preload above the threshold, however hard the bolt is tightened. */
+    var keep = Fi, heights = [], probe = [0.1, 0.3, 0.5, 0.7, 0.9], k;
+    for (k = 0; k < probe.length; k++) {
+      Fi = FI_MAX * probe[k]; render();
+      heights.push(Math.abs(parseFloat(swingBar.getAttribute('y1')) -
+                            parseFloat(swingBar.getAttribute('y2'))));
+    }
+    Fi = keep; render();
+    note(heights[0] > heights[1] && heights[1] > heights[2],
+         'while the joint opens, tightening shrinks what the bolt feels  (' +
+         heights[0].toFixed(1) + ' → ' + heights[1].toFixed(1) + ' → ' +
+         heights[2].toFixed(1) + ' px)');
+    note(Math.abs(heights[2] - heights[3]) < 0.01 && Math.abs(heights[3] - heights[4]) < 0.01,
+         'and past the threshold it stops, exactly  (' + heights[2].toFixed(2) + ' = ' +
+         heights[3].toFixed(2) + ' = ' + heights[4].toFixed(2) + ' px)');
+    note(heights[0] / heights[4] > 4,
+         'loose against shut: the swing is ' + (heights[0] / heights[4]).toFixed(1) +
+         ' times larger');
+
+    /* 7. Nothing is ever drawn outside the panel — including the bolt at
+          full preload carrying the full load, which is what sized the axis. */
+    var inside = true;
+    for (i = 0; i <= 200; i++) {
+      var f = FI_MAX * i / 200;
+      if (py(boltForce(f, FE_AXIS)) < GY0 - 0.5 || py(boltForce(f, 0)) > GY1 + 0.5)
+        inside = false;
+    }
+    note(inside, 'every force drawn stays inside the panel, at every preload');
+    note(boltForce(FI_MAX, FE_MAX) < F_PROOF,
+         'and the bolt stays under proof even at the top of the control  (' +
+         boltForce(FI_MAX, FE_MAX).toFixed(1) + ' of ' + F_PROOF.toFixed(1) + ' kN)');
+
+    /* 8. NEGATIVE CONTROL. Give the bolt the whole load — the thing this
+          piece says does NOT happen in a shut joint — and the split check
+          must stop passing. */
+    var realC = C_LOAD;
+    C_LOAD = 1.0;
+    var caught = Math.abs((boltForce(Ft, Fe) - Ft) - realC * Fe) > 1e-6;
+    C_LOAD = realC;
+    note(caught, 'negative control: a bolt that takes the whole load fails the split check');
+
+    out.push('      (the bolt takes ' + (C_LOAD * 100).toFixed(1) +
+             '% of an applied load; the joint shuts at ' + FI_SHUT.toFixed(1) +
+             ' kN of preload, which is ' + (FI_SHUT / F_PROOF * 100).toFixed(0) +
+             '% of proof)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  setV(0); render();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('bolt preload: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate(); else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

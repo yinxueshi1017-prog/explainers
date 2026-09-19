@@ -168,6 +168,15 @@ for p in pages:
 # gets shorter, so every piece has to point at it and it has to cover every
 # piece. A twelfth explainer that shipped without an entry would be inviting a
 # review it gives the reviewer no way to start.
+# audit.py has to have looked at each piece too. A piece that shipped without
+# an entry there would be covered only by checks written beside its own model,
+# which is the exact blind spot audit.py exists to close.
+aud = open("audit.py", encoding="utf-8").read() if os.path.exists("audit.py") else ""
+for q in pages:
+    if "el('text'" not in src[q]:
+        continue
+    check('consts("%s"' % q in aud, "audit.py independently checks %s" % q)
+
 check(os.path.exists("REVIEW.md"), "REVIEW.md exists")
 if os.path.exists("REVIEW.md"):
     rv = open("REVIEW.md", encoding="utf-8").read()

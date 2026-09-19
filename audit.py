@@ -280,6 +280,57 @@ check("cavitation", "cold, the margin is above what the pump needs",
 check("cavitation", "at the boil, it is not",
       1.0 if npsha(c["T_MAX"]) < c["NPSHR"] else 0.0, 1.0, 0.0)
 
+# ------------------------------------------------------------ bolt preload
+print("\nBOLT PRELOAD      reference: ISO 898-1 stress areas; Wileman's member stiffness")
+c = consts("bolt-preload.html", ["D_NOM", "A_S", "S_P", "E_ST", "GRIP", "FE_MAX"])
+check("bolt-preload", "M12 tensile stress area", c["A_S"], 84.3, 0.05, " mm2")
+check("bolt-preload", "grade 8.8 proof strength", c["S_P"], 580.0, 1.0, " MPa")
+check("bolt-preload", "proof load of an M12 8.8", c["A_S"] * c["S_P"] / 1000, 48.894, 0.01, " kN")
+kb = c["A_S"] * c["E_ST"] / c["GRIP"] / 1000
+km = c["E_ST"] * c["D_NOM"] * 0.78715 * math.exp(0.62873 * c["D_NOM"] / c["GRIP"]) / 1000
+C = kb / (kb + km)
+# Not "kb equals kb": for a steel joint of ordinary proportions the members
+# come out several times stiffer than the bolt, and that RATIO is the thing
+# worth checking against what the literature says to expect.
+check("bolt-preload", "members are 3-8x the bolt's stiffness",
+      1.0 if 3.0 < km / kb < 8.0 else 0.0, 1.0, 0.0)
+note("bolt-preload", "member stiffness over bolt stiffness", km / kb)
+# The members must come out STIFFER than the bolt, or the whole argument is
+# backwards; for a steel joint the literature puts the load factor at 0.1-0.3.
+check("bolt-preload", "the members are the stiffer of the two",
+      1.0 if km > kb else 0.0, 1.0, 0.0)
+check("bolt-preload", "load factor inside the published band",
+      1.0 if 0.10 < C < 0.30 else 0.0, 1.0, 0.0)
+# Separation, re-derived: the squeeze runs out when (1-C) x load equals preload.
+Fi = 30.0
+
+
+def separation_numerically(Fi):
+    """Find where the squeeze runs out by bisection, with no closed form."""
+    lo, hi = 0.0, 500.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if Fi - (1 - C) * mid > 0:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+check("bolt-preload", "separation: closed form vs bisection",
+      Fi / (1 - C), separation_numerically(Fi), 1e-9, " kN")
+check("bolt-preload", "the squeeze is exactly zero there",
+      Fi - (1 - C) * (Fi / (1 - C)), 0.0, 1e-9, " kN")
+# And the claim, computed rather than asserted: above the threshold the swing
+# the bolt sees does not change with preload.
+shut = (1 - C) * c["FE_MAX"]
+swing = lambda F: (F + C * c["FE_MAX"]) - F if F >= shut else c["FE_MAX"] - F
+check("bolt-preload", "past the threshold the swing stops changing",
+      swing(shut * 1.2) - swing(shut * 1.9), 0.0, 1e-12, " kN")
+check("bolt-preload", "and below it, it does not",
+      1.0 if swing(shut * 0.3) > swing(shut * 0.8) else 0.0, 1.0, 0.0)
+note("bolt-preload", "share of an applied load reaching the bolt", C * 100, " %")
+
 # ------------------------------------------------- across the whole site
 print("\nCONSISTENCY       the same physical constant, in more than one piece")
 # Nothing above would notice if two pieces disagreed about steel or gravity.

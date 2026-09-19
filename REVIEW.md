@@ -66,6 +66,19 @@ specific places where judgement rather than arithmetic decides.
   weaken the headline claim enough to matter to a designer?** Effective length is folded
   into λ and never discussed, which may be the more common error in practice.
 
+### Bolt preload
+- **Model** Linear joint: bolt takes C = kb/(kb+km) of an applied load until the members'
+  compression reaches zero, then all of it. Wileman's fit for member stiffness.
+- **Constants** M12 8.8, 40 mm grip, 25 kN load cycling on and off; C works out at 0.156.
+- **Claim** A properly tightened bolt feels about a sixth of the load; past the preload that
+  keeps the joint shut, tightening further changes that not at all.
+- **Judgement** The load is concentric and applied at the bolt. Real joints are loaded off to
+  one side and prise open at an edge far earlier — **is the concentric case so unrepresentative
+  that leading with it misleads?** Wileman and the VDI 2230 frustum methods disagree enough to
+  move C noticeably; **which would you have used, and does "about a sixth" survive it?** And
+  preload is drawn as a number you choose, when getting it is the whole difficulty — **is
+  ±25% scatter from a torque wrench the right figure to have in mind near the threshold?**
+
 ### Cavitation
 - **Model** NPSH available from the atmosphere less static lift less friction, against
   vapour pressure from Antoine; the pump requires a fixed NPSHr above it.
