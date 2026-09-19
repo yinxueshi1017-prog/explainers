@@ -98,9 +98,19 @@ for p in pages:
         check(os.path.exists(href), "%s -> %s resolves" % (p, href))
 
 print("\nNOTHING OFF-ORIGIN  (the whole argument of the site)")
+# A REQUEST is not a LINK. `src` fetches; a stylesheet `href` fetches; an anchor
+# the reader may click does not, and neither does a canonical URL. An earlier
+# version of this rule rejected all four alike, which would have blocked linking
+# to the source — the one thing that makes "checked against published standards"
+# verifiable by the person reading it.
 for p in pages:
-    for attr in re.findall(r'(?:src|href)="(https?://[^"]+)"', src[p]):
-        check(attr.startswith(BASE), "%s: %s is our own origin" % (p, attr[:60]))
+    for attr in re.findall(r'\bsrc="(https?://[^"]+)"', src[p]):
+        check(attr.startswith(BASE), "%s: src %s is our own origin" % (p, attr[:60]))
+    for tag in re.findall(r'<link\b[^>]*>', src[p]):
+        if 'rel="canonical"' in tag:
+            continue
+        for attr in re.findall(r'href="(https?://[^"]+)"', tag):
+            check(attr.startswith(BASE), "%s: <link> %s is our own origin" % (p, attr[:60]))
 
 print("\nDISCLOSURE  (no engineer has reviewed any of this; every page must say so)")
 for p in pages:
@@ -138,6 +148,21 @@ check(len(allt) == 1, "one turnaround across the whole site (%s)" % (", ".join(s
 for p in pages:
     check(len(prices[p]) == 1, "%s: states what it costs" % p)
     check(len(times[p]) == 1, "%s: states how long it takes" % p)
+
+print("\nTHE AUDIT  (the site now names a file; the file had better be there)")
+# The index and the case study tell a reader they can run audit.py themselves.
+# That is the most load-bearing sentence on the site — it is what turns "checked
+# against published standards" from an assertion into something checkable.
+check(os.path.exists("audit.py"), "audit.py exists")
+if os.path.exists("audit.py"):
+    a = open("audit.py", encoding="utf-8").read()
+    check("def self_test" in a, "the audit proves it can fail")
+    check("AUDIT_DIR" in a, "the self-test can point the audit at a corrupted copy")
+for p in pages:
+    if "audit.py" not in src[p]:
+        continue
+    check("github.com/yinxueshi1017-prog/explainers" in src[p],
+          "%s: names audit.py and says where to get it" % p)
 
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()

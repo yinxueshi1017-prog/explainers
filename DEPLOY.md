@@ -19,8 +19,17 @@ against the real file, every internal link, every `og:image` against a file that
 the pages that exist. It exits non-zero on failure. Every check in it exists because
 something failed once.
 
-The physics is checked separately and inside each piece: open any explainer with `#dev`
-and the assertions print on the page. `#reduce` forces the reduced-motion path.
+```bash
+python3 audit.py
+```
+
+The physics, audited from outside the pages. Each piece also checks itself when you open it
+with `#dev` — but those checks were written beside the model they check, so a shared mistake
+would pass both. `audit.py` reads the constants out of the HTML and compares every central
+claim against an independent source (Eurocode 3, Barsom, Faraday, Inglis, Semenov,
+Joukowsky, handbook water tables), re-does each closed form numerically, and finishes by
+corrupting one constant at a time to prove it can still fail. `#reduce` forces the
+reduced-motion path.
 
 ## Moving it somewhere else
 

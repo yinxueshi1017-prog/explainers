@@ -331,8 +331,13 @@
       Corrections are the main thing that decides what gets built next.
     </p>
     <p class="note">
-      The physics in these pieces is checked against published standards, but has not
-      been reviewed by an independent engineer. Each piece says so on its own page.
+      The physics in these pieces is checked against published standards &mdash; Eurocode,
+      Barsom, Inglis, Semenov, Joukowsky, and handbook tables for water &mdash; by a script
+      you can run yourself: <code>audit.py</code> in
+      <a href="https://github.com/yinxueshi1017-prog/explainers">the source</a>. It reads the constants out of these
+      pages and compares each claim against a value from somewhere else, so a mistake
+      shared between a model and its own check cannot hide. It has not been reviewed by an
+      independent engineer, and each piece says so on its own page.
     </p>
   </footer>
 

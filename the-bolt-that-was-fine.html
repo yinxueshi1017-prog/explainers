@@ -321,7 +321,12 @@
       <h2>What is not verified</h2>
       <p>Stated plainly, because a piece whose value is trustworthiness should not overclaim.</p>
       <ul>
-        <li><strong>No human engineer has reviewed the physics.</strong> Proportions were checked
+        <li><strong>An audit, which is not a review.</strong> <code>audit.py</code> in
+        <a href="https://github.com/yinxueshi1017-prog/explainers">the source</a> re-derives every piece's central claim from published
+        references and re-does each closed form numerically, then corrupts a constant at a
+        time to prove it can still fail. It checks the arithmetic and the constants. It
+        cannot tell you the relation is the right one for your problem.</li>
+      <li><strong>No human engineer has reviewed the physics.</strong> Proportions were checked
         against ISO metric coarse practice and the joint mechanics hold up, but that check was mine.
         Before this ships as authority, it wants a metallurgist's eye.</li>
         <li><strong>The sound path is measured on one browser engine.</strong> Chromium here; the
