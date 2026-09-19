@@ -78,6 +78,19 @@ for p in pages:
           "%s: og:image is a file that exists" % p)
     check(not (img or "").endswith(".svg"), "%s: og:image is not SVG (crawlers reject it)" % p)
 
+print("\nTHE INDEX CALLS EACH PIECE WHAT THE PIECE CALLS ITSELF")
+# This is where the drift started: the index said "Fatigue cracks", the tab said
+# "Fatigue Crack Growth", the card said "Fatigue crack growth". The index is a
+# reader's first sight of a name; it has to be the same name.
+idx = src["index.html"]
+headings = {}
+for m in re.finditer(r'<a class="piece" href="([^"]+)">\s*<h3>(.*?)<span', idx, re.S):
+    headings[m.group(1)] = re.sub(r"\s+", " ", m.group(2)).strip()
+check(len(headings) == len(pages) - 1, "the index links every page but itself (%d)" % len(headings))
+for href, heading in sorted(headings.items()):
+    title = re.search(r"<title>(.*?)</title>", src[href], re.S).group(1).strip()
+    check(heading == title, "index calls %s %r, and it calls itself %r" % (href, heading, title))
+
 print("\nLINKS  (a pitch page once linked to a claim that had been cut)")
 for p in pages:
     for href in re.findall(r'href="([^"#?]+)[^"]*"', src[p]):
