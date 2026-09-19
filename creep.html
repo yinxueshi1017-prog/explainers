@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creep</title>
+<meta name="description" content="Ten degrees hotter halves how long it lasts. Creep trades time against temperature, so a small drift in operating temperature spends most of a design life — and nothing on the outside shows it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M4.6%202.6%20L4.6%2013.4%20M11.4%202.6%20L11.4%2013.4%22%20stroke%3D%22%23cbd5dd%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M4.6%208%20C3%208%203%208%202.4%208%20M11.4%208%20C13%208%2013%208%2013.6%208%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. The
+  Larson-Miller time-temperature relation drawn into SVG — no canvas, no
+  WebGL.
+
+  THE ARGUMENT: creep damage can be bought with time or with temperature, and
+  the exchange rate is savage. The two are traded through one parameter, so a
+  component run a little hotter than it was designed for does not lose a
+  little life — it loses most of it. Ten degrees halves it. Fifty degrees
+  takes a decade down to a season.
+
+  And it is the one failure mode in this set that leaves nothing at all to
+  inspect for most of its life: the metal is deforming a few millionths at a
+  time, uniformly, with no crack to find and no sound to hear. The only
+  instrument that would have caught it is a thermometer, read years earlier.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #cr-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #cr-view:focus { outline:none; }
+  #cr-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #cr-view .lbl { font-size:15px; }
+  #cr-view .lbl-sm { font-size:13px; }
+  @media (max-width:34rem) { #cr-view .lbl { font-size:40px; } #cr-view .lbl-sm { font-size:34px; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Creep — the exchange rate between degrees and years</h1>
+
+  <p class="how" id="cr-how">
+    The component is designed to last its full service life at its design temperature. Drag
+    upward to run it hotter than that; drag down to run it cooler. The arrow keys do the same.
+    <strong>End is as hot as this goes</strong>; Home is the coolest. The pale bar is the life
+    it was supposed to have. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="cr-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="cooler than design"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="cr-how"
+         aria-label="How hot the component is run"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the component, and how hot it is held. Right: how long it lasts, against the life it was designed for.</span>
+      <span id="cr-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="cr-sound" aria-pressed="false">Sound</button>
+    <button id="cr-reset">Reset</button>
+  </div>
+
+  <p class="live" id="cr-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Hold metal hot and loaded and it slowly changes shape, even under a stress it could carry
+    indefinitely when cold. It is not yielding and it is not cracking: the atoms are simply
+    rearranging, a little at a time, and the part is getting longer. Eventually it thins
+    enough somewhere to let go.
+  </p>
+  <p class="body">
+    How long that takes depends on time and temperature together, and the two are traded
+    against each other. The same damage can be bought with a long spell at a moderate
+    temperature or a short spell at a high one — and because the trade is exponential, a small
+    step in temperature buys a very large amount of time.
+  </p>
+  <p class="body">
+    So a component that drifts ten degrees above its design temperature has not lost ten
+    degrees' worth of margin. It has lost half its life. Thirty degrees costs about four
+    fifths of it, and fifty takes a decade down to a season.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Temperature control is life extension.</strong> Nothing else available to an
+    operator moves creep life as far as a few degrees does. A burner adjustment, a cleaned
+    heat exchanger or a corrected instrument buys years — and the same few degrees the other
+    way spends them.
+  </p>
+  <p class="body">
+    <strong>There is nothing to inspect for, for most of the life.</strong> The metal is
+    deforming a few millionths at a time, uniformly, with no crack to find. By the time
+    anything is visible the remaining life is short. The instrument that would have caught
+    this is a thermometer, read years earlier — which is why operating records matter more
+    than inspection reports for plant that runs hot.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The relation is the standard
+      Larson-Miller parameter with an ordinary constant for steels, and the built-in checks
+      confirm the arithmetic exactly — but that check is the author's own, not a plant or
+      materials engineer's.</li>
+    <li><strong>The constant is a fitted number, not a law.</strong> Twenty is the usual
+      starting value for steels; real materials are fitted individually and the value varies.
+      Change it and every life on this page changes with it.</li>
+    <li><strong>One stress, held constant.</strong> Creep life depends on stress as strongly
+      as it depends on temperature, and this piece holds stress fixed to isolate the
+      temperature trade. A real assessment moves both.</li>
+    <li><strong>Extrapolation is the whole difficulty in practice.</strong> Design lives run
+      to decades and test data does not, so the numbers that matter are always extrapolated
+      from shorter, hotter tests — which is exactly the operation this relation was invented
+      to perform, and exactly where it is least trustworthy.</li>
+    <li><strong>No damage accumulation, no history.</strong> Real components see varying
+      temperature and accumulate damage in fractions; this shows steady operation at one
+      temperature, which no plant does.</li>
+    <li><strong>The bulge drawn on the component is indicative.</strong> It shows that
+      deformation is happening, not how much — the model gives a time to rupture, not a
+      strain history.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE COMPONENT
+     ================================================================== */
+
+  var C_LM   = 20;              /* Larson-Miller constant, the usual
+                                   starting value for steels             */
+  var T_DES  = 550 + 273.15;    /* K — design temperature                */
+  var T_DES_LIFE = 1e5;         /* h — and the life it is designed for   */
+  var T_MIN  = 525 + 273.15, T_MAX = 625 + 273.15;
+
+  /* The parameter that ties time and temperature together. For one stress
+     it is a constant, which is the entire content of the idea. */
+  var LMP = T_DES * (C_LM + Math.log(T_DES_LIFE) / Math.LN10);
+
+  function lifeAt(TK) { return Math.pow(10, LMP / TK - C_LM); }
+  function lmpOf(TK, hours) { return TK * (C_LM + Math.log(hours) / Math.LN10); }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('cr-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var PX = 90, PW = 230, PY = 96, PH = 250;     /* the component          */
+  var BX0 = 430, BX1 = 950, BY = 150, BH = 44;  /* the life bars          */
+
+  /* A LOG AXIS, because the quantity spans three decades across the control
+     and a linear one would show the whole interesting half as a stub at the
+     left. Its price is that a doubling is a fixed distance rather than a
+     doubled length, so the piece never asks the reader to compare lengths —
+     it marks the design life and asks only which side of it you are on. */
+  var L_LO = 100, L_HI = 1e6;                   /* hours                  */
+  function bx(h) {
+    var t = (Math.log(h) - Math.log(L_LO)) / (Math.log(L_HI) - Math.log(L_LO));
+    return BX0 + (BX1 - BX0) * Math.max(0, Math.min(1, t));
+  }
+
+  /* ONE SATURATED COLOUR, and it is the shortfall: the part of the design
+     life the component will not reach. The component and the design bar are
+     cool steel, so the only saturated thing in the drawing is what was lost. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+
+  var comp = el('path', { d: '', fill: STEEL, opacity: '.72' });
+  el('text', { x: PX + PW / 2, y: PY - 24, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.6' }).textContent = 'the component';
+  /* how hot it is held, as a band behind it */
+  var heat = el('rect', { x: PX - 30, y: PY - 6, width: PW + 60, height: PH + 12, rx: 4,
+                          fill: HOT, opacity: '.06' });
+  view.insertBefore(heat, comp);
+  var heatLbl = el('text', { x: PX + PW / 2, y: PY + PH + 34, 'class': 'lbl-sm',
+                             'text-anchor': 'middle', fill: 'currentColor', opacity: '.6' });
+
+  /* the design life, drawn once and never moved */
+  el('rect', { x: BX0, y: BY, width: bx(T_DES_LIFE) - BX0, height: BH, rx: 2,
+               fill: STEEL, opacity: '.28' });
+  el('line', { x1: bx(T_DES_LIFE), y1: BY - 18, x2: bx(T_DES_LIFE), y2: BY + BH + 18,
+               stroke: STEEL, 'stroke-width': 2, opacity: '.8' });
+  /* Anchored to the marker and running back to the left, so it cannot reach
+     the word at the right-hand end of the axis. */
+  el('text', { x: bx(T_DES_LIFE), y: BY - 26, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.7' }).textContent = 'designed for';
+
+  /* the life it actually gets, and the shortfall */
+  var got = el('rect', { x: BX0, y: BY + BH + 30, height: BH, rx: 2, fill: STEEL });
+  var lost = el('rect', { y: BY + BH + 30, height: BH, rx: 2, fill: HOT, opacity: '.55' });
+  var gotLbl = el('text', { x: BX0, y: BY + BH + 30 + BH + 26, 'class': 'lbl-sm',
+                            fill: 'currentColor', opacity: '.7' });
+  gotLbl.textContent = 'what it actually gets';
+  el('text', { x: BX0, y: BY - 58, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.5' }).textContent = 'shorter';
+  el('text', { x: BX1, y: BY - 58, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.5' }).textContent = 'longer';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var T = T_DES;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    cooler: 'Cooler than design. The life has gone up by far more than the temperature came ' +
+            'down, because the trade runs both ways — and this is the cheapest life extension ' +
+            'available to anyone operating hot plant. A cleaned exchanger or a corrected ' +
+            'instrument is worth years.',
+    design: 'At the design temperature, reaching exactly the life it was designed for. ' +
+            'Nothing about the component looks different at any setting on this control, ' +
+            'which is the difficulty: the only instrument that distinguishes these cases is ' +
+            'a thermometer.',
+    over:   'Hotter than design, and already short. Notice how little the control had to move ' +
+            'to take a substantial bite out of the life — the exchange rate between degrees ' +
+            'and years is not gentle, and nothing here is visibly wrong.',
+    bad:    'Well over. Most of the design life has gone. A plant running here is not ' +
+            'approaching the end of its life gradually; it has already spent it, and the ' +
+            'record that proves it is the temperature log rather than anything an inspector ' +
+            'could have found.',
+    gone:   'Far over. What was designed as a working lifetime is now a matter of months. ' +
+            'The component is not defective, the steel is not substandard, and there is ' +
+            'nothing to find on it. It is simply being asked to be somewhere it cannot be ' +
+            'for long.'
+  };
+  var live = document.getElementById('cr-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     Creep is silent, so this does not pretend otherwise. What is sonified is
+     the exchange rate: a slow pulse whose rate follows how fast life is
+     being spent. At design it ticks along; run it hot and it races.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, timer = null;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (A) audio = new A();
+    } catch (e) { audio = null; }
+  }
+  function blip() {
+    if (!audio || !soundOn) return;
+    var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 0.09), sr);
+    var d = b.getChannelData(0), i;
+    for (i = 0; i < d.length; i++) {
+      var t = i / sr;
+      d[i] = Math.sin(2 * Math.PI * 520 * t) * Math.exp(-t * 48);
+    }
+    var s = audio.createBufferSource(); s.buffer = b;
+    var g = audio.createGain(); g.gain.value = 0.16;
+    s.connect(g); g.connect(audio.destination); s.start();
+  }
+  function retime() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (!soundOn) return;
+    /* the rate is how fast the design life is being consumed */
+    var rate = T_DES_LIFE / lifeAt(T);
+    var ms = Math.max(70, 900 / rate);
+    timer = setInterval(blip, ms);
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var life = lifeAt(T);
+    var over = (T - T_DES);
+
+    /* the component. It bulges a little when it is being run hard — drawn
+       as an indication that deformation is happening, not as a strain the
+       model computed, and the honesty section says exactly that. */
+    var bulge = 4 + 26 * Math.max(0, Math.min(1, over / (T_MAX - T_DES)));
+    comp.setAttribute('d',
+      'M' + PX + ' ' + PY + ' L' + (PX + PW) + ' ' + PY +
+      ' Q' + (PX + PW + bulge) + ' ' + (PY + PH / 2) + ' ' + (PX + PW) + ' ' + (PY + PH) +
+      ' L' + PX + ' ' + (PY + PH) +
+      ' Q' + (PX - bulge) + ' ' + (PY + PH / 2) + ' ' + PX + ' ' + PY + ' Z');
+    heat.setAttribute('opacity',
+      (0.04 + 0.34 * Math.max(0, Math.min(1, (T - T_MIN) / (T_MAX - T_MIN)))).toFixed(3));
+    /* SHORT. The sentence versions of these were nearly three times the
+       width of the column they are centred on once the phone label size
+       applies, and ran off the left of the drawing. The live region carries
+       the full wording. */
+    heatLbl.textContent = over > 1 ? 'hotter' : over < -1 ? 'cooler' : 'as designed';
+
+    /* the two bars */
+    var xg = bx(life), xd = bx(T_DES_LIFE);
+    got.setAttribute('width', Math.max(1, xg - BX0));
+    got.setAttribute('fill', life < T_DES_LIFE ? STEEL : STEEL);
+    if (life < T_DES_LIFE) {
+      lost.setAttribute('x', xg); lost.setAttribute('width', Math.max(0, xd - xg));
+      lost.setAttribute('opacity', '.55');
+    } else { lost.setAttribute('width', 0); lost.setAttribute('opacity', '0'); }
+
+    var frac = life / T_DES_LIFE;
+    document.getElementById('cr-cmp').textContent =
+      Math.abs(frac - 1) < 0.02 ? 'Exactly the design life.' : '';
+
+    view.setAttribute('aria-valuenow',
+      Math.round((T - T_MIN) / (T_MAX - T_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      frac > 1.5 ? 'cooler than design' :
+      Math.abs(frac - 1) < 0.02 ? 'at the design temperature' :
+      frac > 0.4 ? 'a little over' : frac > 0.08 ? 'well over' : 'far over');
+
+    say(frac > 1.5 ? 'cooler' : Math.abs(frac - 1) < 0.02 ? 'design' :
+        frac > 0.4 ? 'over' : frac > 0.08 ? 'bad' : 'gone');
+    retime();
+  }
+
+  /* ==================================================================
+     7. REDUCED MOTION
+
+     Nothing animates: every quantity is a function of the control alone.
+     The reduced branch is the same branch, and the payoff — the shortfall
+     opening up under the design bar — is untouched.
+     ================================================================== */
+
+  /* ==================================================================
+     8. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setT(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    T = T_MIN + (T_MAX - T_MIN) * v;
+    render();
+  }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = (T - T_MIN) / (T_MAX - T_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setT(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = (T - T_MIN) / (T_MAX - T_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setT(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setT(v - 0.05);
+    else if (k === 'PageUp') setT(v + 0.2);
+    else if (k === 'PageDown') setT(v - 0.2);
+    else if (k === 'End') setT(1);
+    else if (k === 'Home') setT(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('cr-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    retime();
+  });
+  document.getElementById('cr-reset').addEventListener('click', function () {
+    setT((T_DES - T_MIN) / (T_MAX - T_MIN));
+  });
+
+  /* ==================================================================
+     9. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got2, want, tol, unit) {
+      var pass = Math.abs(got2 - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got2.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. At the design temperature it reaches exactly the design life. */
+    chk('design temperature gives the design life', lifeAt(T_DES), T_DES_LIFE, 1, ' h');
+
+    /* 2. THE HEADLINE. Ten degrees hotter leaves about half the life — and
+          the value is whatever the relation says, not a rounded claim. */
+    var half = lifeAt(T_DES + 10) / T_DES_LIFE;
+    chk('ten degrees hotter', half, Math.pow(10, LMP / (T_DES + 10) - C_LM) / T_DES_LIFE,
+        1e-12);
+    if (half > 0.45 && half < 0.55) {
+      out.push('PASS  ten degrees really does halve it  (leaves ' + half.toFixed(3) + ')');
+    } else { ok = false; out.push('FAIL  ten degrees leaves ' + half.toFixed(3)); }
+
+    /* 3. INTERCHANGEABILITY, which is the whole idea: a hot short exposure
+          and a warm long one sit on the same parameter. */
+    var Thot = T_DES + 50, thot = lifeAt(Thot);
+    chk('a hot short life and a warm long one share the parameter',
+        lmpOf(Thot, thot), lmpOf(T_DES, T_DES_LIFE), 1e-6);
+
+    /* 4. The parameter is what the definition says it is. */
+    chk('the parameter itself', LMP,
+        T_DES * (C_LM + Math.log(T_DES_LIFE) / Math.LN10), 1e-9);
+
+    /* 5. Monotonic: hotter is always shorter, everywhere in range. */
+    var mono = true, prev = Infinity;
+    for (var i = 0; i <= 100; i++) {
+      var Tt = T_MIN + (T_MAX - T_MIN) * i / 100, L = lifeAt(Tt);
+      if (L > prev) mono = false;
+      prev = L;
+    }
+    if (mono) out.push('PASS  hotter is shorter at every point in range');
+    else { ok = false; out.push('FAIL  life is not monotonic in temperature'); }
+
+    /* 6. NEGATIVE CONTROL. Take the temperature out of the parameter — so
+          that life no longer depends on how hot it is run — and check 2
+          must stop passing. */
+    var realLife = lifeAt;
+    lifeAt = function () { return T_DES_LIFE; };
+    var caught = Math.abs(lifeAt(T_DES + 10) / T_DES_LIFE - 0.5) > 0.05;
+    lifeAt = realLife;
+    if (caught) out.push('PASS  negative control: a temperature-free life fails the halving check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (design life ' + (T_DES_LIFE / 8760).toFixed(1) + ' years; fifty over, ' +
+             (lifeAt(T_DES + 50) / 8760).toFixed(2) + ' years)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     10. GO
+     ================================================================== */
+
+  setT((T_DES - T_MIN) / (T_MAX - T_MIN));
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('creep: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>
