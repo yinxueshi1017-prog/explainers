@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fatigue Crack Growth</title>
+<meta name="description" content="A crack grows as the cube of the stress range. Count the inspections that fall between the size you could find it at and the size it fails at — at high stress range, there are none.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Crect%20x%3D%222.4%22%20y%3D%224.2%22%20width%3D%2211.2%22%20height%3D%227.6%22%20rx%3D%22.8%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Cpath%20d%3D%22M8%2011.8%20L7.1%209.6%20L8.7%208.2%20L7.4%206.4%22%20fill%3D%22none%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.4%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. Paris-law crack
+  growth integrated live and drawn into SVG — no canvas, no WebGL.
+
+  THE ARGUMENT, and it is a decision rather than a mechanism: an inspection
+  programme is a bet that the crack will spend long enough in the detectable
+  band for somebody to walk past it with the right equipment. Whether that bet
+  pays has almost nothing to do with the total life of the joint. It depends on
+  the length of the band, in cycles — and that length falls as the CUBE of the
+  stress range.
+
+  So the useful question is not "how long will it last", it is "how many
+  inspections land in the window". The drawing answers it by letting you count
+  the marks. Past a certain stress range the answer is none, and the joint was
+  never inspectable however diligent the programme was.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:   #0e1114;
+    --card:     #141a20;
+    --ink:      #cbd5dd;
+    --ink-dim:  #7d8fa0;
+    --ink-lede: #9fb0c0;
+    --rule:     #2a3138;
+    --rule-soft:#1e242a;
+    --accent:   #93a9c0;
+    --focus:    #e0864a;
+  }
+  @media print {
+    :root {
+      --ground:#ffffff; --card:#ffffff; --ink:#1a1f24; --ink-dim:#43505c;
+      --ink-lede:#1a1f24; --rule:#8d97a1; --rule-soft:#c8ced4;
+      --accent:#1a1f24; --focus:#1a1f24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+
+  h1 { font-size: 1.02rem; font-weight: 600; letter-spacing: .075em;
+       text-transform: uppercase; margin: 0 0 .85rem; }
+  .how { color: var(--ink-lede); margin: 0 0 1.3rem; font-size: .97rem; max-width: 47rem; }
+
+  .stage { border: 1px solid var(--rule); border-radius: 3px;
+           background: var(--card); padding: .6rem .6rem .35rem; }
+  svg { display: block; width: 100%; height: auto; }
+
+  #fc-view { touch-action: none; cursor: ns-resize; border-radius: 2px; }
+  #fc-view:focus { outline: none; }
+  #fc-view:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Measured: a 1000-unit viewBox at 375px renders at about 0.32, so anything
+     under ~36 units is unreadable on a phone. */
+  #fc-view .lbl { font-size: 15px; }
+  #fc-view .lbl-sm { font-size: 13px; }
+  @media (max-width: 34rem) {
+    #fc-view .lbl { font-size: 40px; }
+    #fc-view .lbl-sm { font-size: 34px; }
+  }
+
+  .cap { display: flex; justify-content: space-between; gap: 1rem;
+         color: var(--ink-dim); font-size: .78rem; margin: .5rem .2rem 0; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .9rem 0 0; }
+  button {
+    font: inherit; font-size: .85rem; color: var(--ink); background: transparent;
+    border: 1px solid var(--rule); border-radius: 3px; padding: .32rem .7rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--ground);
+                                border-color: var(--ink); }
+
+  .live { color: var(--ink-lede); font-size: .95rem; margin: .9rem 0 0;
+          min-height: 5.4em; max-width: 48rem; }
+
+  h2 { font-size: .78rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+       color: var(--ink-dim); margin: 2.8rem 0 .9rem; }
+  p.body { max-width: 44rem; margin: 0 0 1rem; }
+  .note { color: var(--ink-dim); font-size: .9rem; max-width: 44rem; }
+  ul.note { padding-left: 1.1rem; }
+  ul.note li { margin-bottom: .45rem; }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--rule);
+           color: var(--ink-dim); font-size: .9rem; }
+  a { color: var(--accent); }
+
+  @media (max-width: 34rem) { .wrap { padding-top: 1.7rem; } .cap { font-size: .72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Fatigue cracks — count the inspections that land in the window</h1>
+
+  <p class="how" id="fc-how">
+    Drag upward to raise the stress range the joint sees; drag down to lower it. The arrow
+    keys do the same, a step at a time. <strong>End goes to the heaviest duty</strong>; Home
+    to the lightest. The marks along the bottom are inspections, one a year. The ones that
+    fall inside the shaded band are the only chances anybody ever gets. Sound is off until
+    you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="fc-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="light duty"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="fc-how"
+         aria-label="The stress range this joint sees in service"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the crack, in section. Right: how deep it is, against cycles endured.</span>
+      <span id="fc-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="fc-sound" aria-pressed="false">Sound</button>
+    <button id="fc-reset">Reset</button>
+  </div>
+
+  <p class="live" id="fc-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    A crack in a steel joint grows a little on every load cycle. How much depends on how hard
+    the crack tip is being worked, which depends on the stress range and on how deep the crack
+    already is. Both of those raise the rate, so growth accelerates: the crack spends a long
+    time being small and a short time being large. That is the shape of the curve on the right,
+    and it is why a crack that has been harmless for years is not reassuring.
+  </p>
+  <p class="body">
+    Two sizes matter. There is the depth at which an inspector could actually find it — below
+    that, it is there and nobody can see it. And there is the depth at which the remaining
+    section can no longer carry the load. The span between them is the entire opportunity to
+    do anything about it.
+  </p>
+  <p class="body">
+    That span is measured in cycles, and it falls as the <strong>cube</strong> of the stress
+    range. Doubling the stress range does not halve your chances; it divides them by eight.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Total life is the wrong number to manage.</strong> A joint can have a long life and
+    still be uninspectable, because almost all of that life is spent below the size anyone can
+    find. What an inspection programme is buying is the window — and the window can be short
+    while the life is long.
+  </p>
+  <p class="body">
+    <strong>The fraction of life spent undetectable barely moves.</strong> Change the stress
+    range and the total life changes enormously, but the proportion of it spent hidden stays
+    about the same. So you cannot inspect your way out of a stress problem: lowering the stress
+    range buys real time, while inspecting more often only helps if a window exists to inspect
+    inside.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The model is the Paris law with the
+      Barsom mean-line constants for ferrite-pearlite steels, and the built-in checks confirm
+      the integration reproduces the closed form exactly — but that check is the author's own,
+      not a fracture-mechanics engineer's.</li>
+    <li><strong>A mean line is not a design line.</strong> Real crack growth data scatters
+      by a factor of two or more about it, and assessment codes deliberately use an upper
+      bound rather than the mean. Treated as design guidance, the numbers here are optimistic.</li>
+    <li><strong>One crack, one shape, one constant geometry factor.</strong> Real cracks change
+      aspect ratio as they grow, interact with each other, and sit in stress fields that the
+      single factor used here does not describe.</li>
+    <li><strong>No threshold and no closure.</strong> Below a certain stress intensity range
+      cracks effectively stop growing, and this model keeps growing them, which is
+      conservative. It also ignores retardation after overloads, which is not.</li>
+    <li><strong>Detection is drawn as a clean line.</strong> Real inspection has a probability
+      of detection that rises gradually with size — an inspection inside the window can still
+      miss, which makes the real case worse than the one drawn.</li>
+    <li><strong>The critical size is taken as the section depth</strong> over most of this
+      range, with the fracture-limited size used when it is smaller. Real failure may come
+      sooner, by plastic collapse of the remaining ligament.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE JOINT, AND WHY THESE NUMBERS
+     ================================================================== */
+
+  var C_P  = 6.9e-12;   /* Paris coefficient, da/dN in m/cycle with dK in
+                           MPa*sqrt(m): the Barsom mean line for
+                           ferrite-pearlite steels                        */
+  var M_P  = 3.0;       /* Paris exponent — the cube that the whole
+                           argument turns on                              */
+  var Y    = 1.12;      /* geometry factor for an edge crack              */
+  var KIC  = 60;        /* MPa*sqrt(m), a plain structural steel          */
+  var THK  = 0.040;     /* m of section the crack has to cross            */
+  var A0   = 0.0005;    /* m — the flaw it starts from, half a millimetre */
+  var AD   = 0.002;     /* m — the depth an inspector could find it at    */
+
+  var CYC_PER_YEAR = 365000;   /* 1000 cycles a day: a busy crane, a
+                                  highway bridge detail                   */
+  var N_AXIS = 12.0e6;         /* cycles across the plot — about thirty
+                                  three years at that rate                */
+
+  /* THE RANGE IS CHOSEN SO THE WINDOW IS ON THE PLOT THROUGHOUT.
+     It started at 30 MPa, where the crack does not even become findable
+     inside the plotted period — so no mark could fall in the band, and the
+     piece counted zero and said what it says for zero: that nobody ever had
+     a chance. That is the opposite of the truth for a joint that lightly
+     loaded. Zero marks meant two contradictory things and the drawing
+     asserted the wrong one. From 55 MPa the whole window is on the axis at
+     every setting, and zero means only one thing.
+
+     THE TOP OF THE RANGE IS SET BY A CLAIM THAT HAS TO BE DEMONSTRABLE.
+     At 150 MPa the window is about half a year wide but sits around the
+     first anniversary, so a yearly mark always lands in it: the piece could
+     never show zero chances, while the prose and the narration both claimed
+     it. Measured across the whole control: zero was unreachable. At 200 MPa
+     the window is a fifth of a year and closes before the first inspection
+     is due, so the claim is one the reader can produce rather than one they
+     have to take on trust. It also brings in the fracture-limited critical
+     depth, which is the regime check five covers. */
+  var DS_MIN = 55, DS_MAX = 200;   /* MPa of stress range                 */
+
+  /* Cycles per second of watching. The heavy end runs out in a few
+     seconds; the light end visibly goes nowhere, which is what a joint
+     with a long life actually looks like. */
+  var RATE = 2.0e5;
+
+  /* The critical depth: whichever comes first, fracture or running out of
+     section. Over most of this range the section is what binds, which is
+     also why the fraction of life spent undetectable barely moves. */
+  function aCrit(ds) {
+    return Math.min(Math.pow(KIC / (Y * ds), 2) / Math.PI, THK);
+  }
+
+  /* CLOSED FORM, for m = 3 exactly: integrating da / (C (Y ds sqrt(pi a))^m)
+     gives (a1^-1/2 - a2^-1/2) / (0.5 C (Y ds sqrt(pi))^m). The piece uses
+     this for the curve and the checks compare it against a step-by-step
+     integration of the same law. */
+  function cycles(a1, a2, ds) {
+    var k = 0.5 * C_P * Math.pow(Y * ds * Math.sqrt(Math.PI), M_P);
+    return (Math.pow(a1, -0.5) - Math.pow(a2, -0.5)) / k;
+  }
+  /* and its inverse: how deep the crack is after n cycles */
+  function depthAt(n, ds) {
+    var k = 0.5 * C_P * Math.pow(Y * ds * Math.sqrt(Math.PI), M_P);
+    var v = Math.pow(A0, -0.5) - n * k;
+    if (v <= 0) return aCrit(ds);
+    return Math.min(Math.pow(v, -2), aCrit(ds));
+  }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('fc-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  /* left: the section */
+  var SX = 60, SW = 210, SY = 70, SH = 280;
+  /* right: the plot */
+  var GX0 = 380, GX1 = 950, GY0 = 70, GY1 = 336;
+
+  function px(n) { return GX0 + (GX1 - GX0) * Math.min(1, n / N_AXIS); }
+  function py(a) { return GY0 + (GY1 - GY0) * Math.min(1, a / THK); }
+
+  /* ONE SATURATED COLOUR, and it is the crack. Everything the inspector
+     works with — the section, the marks, the band — is the same cool steel,
+     so the only thing shouting in the drawing is the defect itself. */
+  var STEEL = 'rgb(126,146,166)';
+  var CRACK = 'rgb(226,78,38)';
+
+  el('rect', { x: SX, y: SY, width: SW, height: SH, rx: 2, fill: STEEL, opacity: '.55' });
+  el('rect', { x: SX, y: SY, width: SW, height: SH, rx: 2, fill: 'none',
+               stroke: 'currentColor', 'stroke-width': 1.2, opacity: '.45' });
+  el('text', { x: SX + SW / 2, y: SY - 26, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.6' }).textContent = 'the section';
+
+  /* the crack eats down from the top surface */
+  var crackPath = el('path', { d: '', stroke: CRACK, 'stroke-width': 4,
+                               'stroke-linecap': 'round', fill: 'none' });
+  var detLine = el('line', { x1: SX - 10, x2: SX + SW + 10, stroke: 'currentColor',
+                             'stroke-width': 1, 'stroke-dasharray': '3 4', opacity: '.5' });
+  /* INSIDE the section, not hanging off its right edge, where it collided
+     with the plot's own axis label at every setting. */
+  var detLbl = el('text', { x: SX + 8, 'class': 'lbl-sm', fill: 'currentColor',
+                            opacity: '.6' });
+  /* SHORT ON PURPOSE. At the phone label size a nineteen-character label is
+     wider than the 210-unit panel it sits in, so it overflowed into the plot
+     and collided with two labels there. Measured at 375px. */
+  detLbl.textContent = 'findable';
+
+  /* -- the plot ------------------------------------------------------ */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('text', { x: GX1, y: GY1 - 10, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'cycles endured →';
+  el('text', { x: GX0 - 8, y: GY0 + 4, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'shallow';
+  el('text', { x: GX0 - 8, y: GY1, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'through';
+
+  /* the window: between findable and critical, in cycles */
+  var band = el('rect', { fill: 'rgb(150,172,190)', opacity: '.14' });
+  var bandLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'middle',
+                             fill: 'rgb(170,190,208)', opacity: '.9' });
+  bandLbl.textContent = 'your only chances';
+
+  el('line', { x1: GX0, y1: py(AD), x2: GX1, y2: py(AD), stroke: 'currentColor',
+               'stroke-width': 1, 'stroke-dasharray': '3 4', opacity: '.45' });
+  var critLine = el('line', { x1: GX0, x2: GX1, stroke: CRACK, 'stroke-width': 1.2,
+                              'stroke-dasharray': '3 4', opacity: '.7' });
+  /* Anchored at the LEFT end of its line: the right end is where the cycle
+     axis label lives, and the critical line sits on the axis whenever the
+     section is what binds. */
+  var critLbl = el('text', { x: GX0 + 8, 'class': 'lbl-sm', fill: CRACK, opacity: '.9' });
+  critLbl.textContent = 'fails here';
+
+  var curve = el('path', { d: '', fill: 'none', stroke: CRACK, 'stroke-width': 2.6,
+                           'stroke-linejoin': 'round' });
+  var nowDot = el('circle', { r: 5, fill: CRACK, opacity: '0' });
+
+  /* the inspections: one mark a year, fixed on the cycle axis so they do
+     not move when the curve reshapes — the whole point is to see the band
+     slide past a ruler that is standing still */
+  var MARKS = Math.floor(N_AXIS / CYC_PER_YEAR);
+  var marks = [];
+  for (var i = 1; i <= MARKS; i++) {
+    marks.push(el('line', { x1: px(i * CYC_PER_YEAR), x2: px(i * CYC_PER_YEAR),
+                            y1: GY1 + 6, y2: GY1 + 20, stroke: STEEL,
+                            'stroke-width': 2, opacity: '.45' }));
+  }
+  el('text', { x: GX0, y: GY1 + 44, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.55' }).textContent = 'inspections, one a year →';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var ds = DS_MIN, n = 0, failed = false;
+
+  var reduce = false;
+  try {
+    reduce = window.matchMedia &&
+             window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) { reduce = false; }
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  function reset() { n = 0; failed = false; saidKey = null; render(); }
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  /* Returns the count AND whether the band is even on the plot, because a
+     count of zero has two opposite meanings and only one of them is the
+     dangerous one. */
+  function chances() {
+    var nd = cycles(A0, AD, ds), nc = cycles(A0, aCrit(ds), ds), c = 0;
+    for (var i = 1; i <= MARKS; i++) {
+      var m = i * CYC_PER_YEAR;
+      if (m >= nd && m <= nc) c++;
+    }
+    return { count: c, beyond: nd > N_AXIS };
+  }
+
+  var SAY = {
+    many: 'Light duty. The crack still grows, and it will still get there eventually — but ' +
+          'it spends so long in the findable band that an inspector would have to miss it ' +
+          'again and again for it to matter. Count the marks inside the band: this is what ' +
+          'an inspectable joint looks like.',
+    few:  'Heavier now. The band has narrowed sharply — far faster than the life has ' +
+          'shortened, because the window closes as the cube of the stress range. There are ' +
+          'still chances in there, but not many, and each one now has to succeed.',
+    one:  'One chance. Everything about the programme — the interval, the method, the ' +
+          'inspector having a good day — now has to work on a single visit. That is not an ' +
+          'inspection regime, it is a coin toss with a schedule attached.',
+    none: 'No chances at all. The crack passes from too small to find to too big to survive ' +
+          'between one annual inspection and the next, so no inspector ever had an ' +
+          'opportunity. Nothing was missed. There was nothing findable to miss.',
+    beyond: 'Light duty. Within the whole period drawn here the crack never even reaches ' +
+            'the size an inspector could find. There are no marks in the band because there ' +
+            'is no band yet — not because nobody had a chance, but because there is barely ' +
+            'anything there to catch.',
+    failed: 'Failed. Look back along the curve: almost all of those cycles were spent with ' +
+            'the crack too small for anyone to see, and the part where it looks alarming is ' +
+            'the short bit at the end. The joint was not deteriorating visibly and then ' +
+            'breaking. It was invisible, and then it broke.'
+  };
+
+  var live = document.getElementById('fc-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     One tick per inspection the cracking passes, so the ear gets the same
+     count the eye does: the ticks inside the band are the chances, and at
+     heavy duty you hear how few of them there are.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, lastMark = 0;
+
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (A) audio = new A();
+    } catch (e) { audio = null; }
+  }
+  function tick(inBand) {
+    if (!audio || !soundOn) return;
+    var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 0.16), sr);
+    var d = b.getChannelData(0), i;
+    for (i = 0; i < d.length; i++) {
+      var t = i / sr;
+      d[i] = Math.sin(2 * Math.PI * (inBand ? 880 : 420) * t) * Math.exp(-t * 34);
+    }
+    var s = audio.createBufferSource(); s.buffer = b;
+    var g = audio.createGain(); g.gain.value = inBand ? 0.3 : 0.12;
+    s.connect(g); g.connect(audio.destination); s.start();
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var ac = aCrit(ds);
+    var nd = cycles(A0, AD, ds), nc = cycles(A0, ac, ds);
+    var a = depthAt(n, ds);
+
+    /* the section, with the crack in it */
+    var depthPx = SY + SH * Math.min(1, a / THK);
+    crackPath.setAttribute('d',
+      'M' + (SX + SW / 2) + ' ' + SY + ' L' + (SX + SW / 2 - 6) + ' ' +
+      ((SY + depthPx) / 2).toFixed(1) + ' L' + (SX + SW / 2) + ' ' + depthPx.toFixed(1));
+    detLine.setAttribute('y1', SY + SH * (AD / THK));
+    detLine.setAttribute('y2', SY + SH * (AD / THK));
+    detLbl.setAttribute('y', SY + SH * (AD / THK) + 26);
+
+    /* the critical depth moves when fracture, not section, is what binds */
+    critLine.setAttribute('y1', py(ac)); critLine.setAttribute('y2', py(ac));
+    critLbl.setAttribute('y', py(ac) - 8);
+
+    /* the window, in cycles */
+    var bx0 = px(nd), bx1 = px(Math.min(nc, N_AXIS));
+    band.setAttribute('x', bx0); band.setAttribute('y', GY0);
+    band.setAttribute('width', Math.max(0, bx1 - bx0));
+    band.setAttribute('height', GY1 - GY0);
+    /* Kept far enough inside the plot that even the phone-sized label cannot
+       reach the section drawing to its left. */
+    bandLbl.setAttribute('x', Math.min(GX1 - 160, Math.max(GX0 + 160, (bx0 + bx1) / 2)));
+    bandLbl.setAttribute('y', GY0 - 12);
+    bandLbl.setAttribute('opacity', (bx1 - bx0) > 40 ? '.9' : '0');
+
+    /* the curve */
+    var d = '', i;
+    for (i = 0; i <= 240; i++) {
+      var nn = N_AXIS * i / 240;
+      var aa = depthAt(nn, ds);
+      d += (i ? ' L' : 'M') + px(nn).toFixed(1) + ' ' + py(aa).toFixed(1);
+      if (aa >= ac) break;
+    }
+    curve.setAttribute('d', d);
+
+    nowDot.setAttribute('cx', px(Math.min(n, N_AXIS)));
+    nowDot.setAttribute('cy', py(a));
+    nowDot.setAttribute('opacity', n > 0 ? '0.95' : '0');
+
+    /* which inspections land inside the window */
+    for (i = 1; i <= MARKS; i++) {
+      var m = i * CYC_PER_YEAR, inBand = m >= nd && m <= nc;
+      marks[i - 1].setAttribute('stroke', inBand ? 'rgb(190,212,232)' : STEEL);
+      marks[i - 1].setAttribute('opacity', inBand ? '1' : '.3');
+      marks[i - 1].setAttribute('y2', inBand ? GY1 + 26 : GY1 + 20);
+    }
+
+    var ch = chances(), c = ch.count;
+    document.getElementById('fc-cmp').textContent =
+      ch.beyond ? 'Nothing findable within the period shown.'
+                : c === 0 ? 'No inspection falls inside the band.' : '';
+
+    view.setAttribute('aria-valuenow',
+      Math.round((ds - DS_MIN) / (DS_MAX - DS_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      failed ? 'the joint has failed' :
+      ch.beyond ? 'nothing findable within the period shown' :
+      c === 0 ? 'heavy enough that no inspection can catch it' :
+      c === 1 ? 'one inspection inside the window' :
+      c < 5 ? 'a few inspections inside the window' : 'light duty');
+  }
+
+  /* ==================================================================
+     7. THE LOOP
+     ================================================================== */
+
+  var last = 0;
+
+  function advance(dtReal) {
+    if (dtReal > 0.25) dtReal = 0.25;
+    if (failed) return;
+    var nd = cycles(A0, AD, ds), nc = cycles(A0, aCrit(ds), ds);
+    var before = n;
+    n += dtReal * RATE;
+
+    /* one tick per inspection passed, pitched by whether it was a chance */
+    for (var i = 1; i <= MARKS; i++) {
+      var m = i * CYC_PER_YEAR;
+      if (m > before && m <= n && m !== lastMark) { lastMark = m; tick(m >= nd && m <= nc); }
+    }
+    if (n >= nc) { n = nc; failed = true; }
+
+    if (failed) say('failed');
+    else {
+      var ch = chances();
+      say(ch.beyond ? 'beyond' : ch.count === 0 ? 'none' :
+          ch.count === 1 ? 'one' : ch.count < 5 ? 'few' : 'many');
+    }
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    var dt = (now - last) / 1000; last = now;
+    advance(dt); render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION — the payoff without the motion
+
+     Nothing here needs to move to make the argument: the curve, the band
+     and the marks are all computed from the stress range alone. So under a
+     reduced-motion preference the marker is simply placed at failure and
+     the drawing is left still. The payoff — count the chances — is
+     untouched, because counting was never an animation.
+     ================================================================== */
+
+  function reducedUpdate() {
+    n = cycles(A0, aCrit(ds), ds); failed = true;
+    render(); saidKey = null;
+    var ch = chances(), c = ch.count;
+    live.textContent = (ch.beyond ? SAY.beyond : c === 0 ? SAY.none :
+                        c === 1 ? SAY.one : c < 5 ? SAY.few : SAY.many) +
+      ' Motion is reduced here, so the curve is drawn complete rather than travelled.';
+  }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setDs(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    ds = DS_MIN + (DS_MAX - DS_MIN) * v;
+    n = 0; failed = false;          /* a different duty is a different joint */
+    if (reduce) reducedUpdate();
+  }
+
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = (ds - DS_MIN) / (DS_MAX - DS_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setDs(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = (ds - DS_MIN) / (DS_MAX - DS_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setDs(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setDs(v - 0.05);
+    else if (k === 'PageUp') setDs(v + 0.2);
+    else if (k === 'PageDown') setDs(v - 0.2);
+    else if (k === 'End') setDs(1);
+    else if (k === 'Home') setDs(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+
+  document.getElementById('fc-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+  });
+  document.getElementById('fc-reset').addEventListener('click', function () {
+    reset(); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. THE INTEGRATION. Step the Paris law cycle-block by cycle-block and
+          it must land on the closed form it was integrated from. This is
+          the quantity the law names, so it is the quantity measured. */
+    function stepwise(a1, a2, dsv) {
+      var a = a1, nn = 0, guard = 0;
+      while (a < a2 && guard++ < 4000000) {
+        var dK = Y * dsv * Math.sqrt(Math.PI * a);
+        var da = C_P * Math.pow(dK, M_P);
+        var blk = Math.max(1, Math.floor(1e-7 / da));   /* adaptive block */
+        a += da * blk; nn += blk;
+      }
+      return nn;
+    }
+    var exact = cycles(A0, aCrit(100), 100);
+    var step = stepwise(A0, aCrit(100), 100);
+    chk('stepwise integration = closed form', step / exact, 1, 0.005);
+
+    /* 2. THE CUBE. Doubling the stress range must divide the life by eight
+          exactly, while the critical depth is set by the section. */
+    chk('double the stress range, an eighth of the life',
+        cycles(A0, aCrit(60), 60) / cycles(A0, aCrit(120), 120), 8, 1e-6);
+
+    /* 3. The window shrinks by the same cube. */
+    chk('the window shrinks as the cube too',
+        cycles(AD, aCrit(60), 60) / cycles(AD, aCrit(120), 120), 8, 1e-6);
+
+    /* 4. THE INVARIANT the prose leans on: the fraction of life spent too
+          small to find does not depend on the stress range. */
+    var f60 = cycles(AD, aCrit(60), 60) / cycles(A0, aCrit(60), 60);
+    var f120 = cycles(AD, aCrit(120), 120) / cycles(A0, aCrit(120), 120);
+    chk('fraction of life after findable is invariant', f120, f60, 1e-9);
+
+    /* 5. The fracture criterion, where it is what binds. */
+    var dsHigh = 200, acF = aCrit(dsHigh);
+    chk('critical depth satisfies the fracture criterion',
+        Y * dsHigh * Math.sqrt(Math.PI * acF), KIC, 1e-6, ' MPa*sqrt(m)');
+
+    /* 6. NEGATIVE CONTROL. Flatten the exponent so growth stops depending
+          on the stress range, and check 2 must stop passing. */
+    var realM = M_P; M_P = 0;
+    var flat = cycles(A0, aCrit(60), 60) / cycles(A0, aCrit(120), 120);
+    M_P = realM;
+    if (Math.abs(flat - 8) > 1e-6) out.push('PASS  negative control: a flat exponent fails the cube check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (at the lightest duty the window is ' +
+             (cycles(AD, aCrit(DS_MIN), DS_MIN) / CYC_PER_YEAR).toFixed(0) +
+             ' years; at the heaviest, ' +
+             (cycles(AD, aCrit(DS_MAX), DS_MAX) / CYC_PER_YEAR).toFixed(2) + ')');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  reset();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('fatigue-crack-growth: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate();
+  else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
