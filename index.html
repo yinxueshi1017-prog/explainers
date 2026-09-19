@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jeremy Wang — interactive explainers</title>
+<meta name="description" content="Interactive explainers for engineering failure modes. One HTML file each, no libraries, no network requests.">
+
+<!-- Same rule as the pieces themselves: no libraries, no build step, no network
+     requests. System font stack rather than a web font, because a page whose
+     argument is partly "I do not make network requests" should not open with three. -->
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:   #0e1114;   /* matched to the explainer's own stage colour */
+    --card:     #151a1f;
+    --ink:      #cbd5dd;
+    --ink-dim:  #7d8fa0;
+    --ink-lede: #9fb0c0;
+    --rule:     #2a3138;
+    --accent:   #93a9c0;
+  }
+  /* PINNED DARK, not following the OS. The hydrogen piece is a dark
+     instrument panel by brief — its colour argument needs a dark ground and
+     it does not invert — so a site that went light around it would put a
+     white page against a dark drawing. One ground everywhere instead.
+
+     ON PAPER, though, it must invert: print dialogs drop CSS backgrounds by
+     default, which would take the ground and leave the pale ink on white. */
+  @media print {
+    :root {
+      --ground:   #ffffff;
+      --card:     #ffffff;
+      --ink:      #1a1f24;
+      --ink-dim:  #43505c;
+      --ink-lede: #1a1f24;
+      --rule:     #8d97a1;
+      --accent:   #1a1f24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 47rem; margin: 0 auto; padding: 4.5rem 1.25rem 5rem; }
+
+  header { border-bottom: 1px solid var(--rule); padding-bottom: 2rem; }
+  h1 {
+    font-size: 1.05rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; margin: 0 0 1.1rem;
+  }
+  .lede { color: var(--ink-lede); font-size: 1.18rem; line-height: 1.55; margin: 0; }
+  .lede strong { font-weight: 600; color: var(--ink); }
+
+  h2 {
+    font-size: .78rem; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-dim);
+    margin: 3.2rem 0 1.4rem;
+  }
+
+  .piece {
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--card);
+    padding: 1.45rem 1.5rem; margin-bottom: 1rem;
+  }
+  .piece:hover, .piece:focus-visible { border-color: var(--accent); }
+  .piece:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .piece h3 { margin: 0 0 .4rem; font-size: 1.12rem; font-weight: 600; }
+  .piece p  { margin: 0; color: var(--ink-dim); font-size: .95rem; line-height: 1.55; }
+  .piece .go { color: var(--accent); white-space: nowrap; }
+
+  .facts {
+    margin: .85rem 0 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: .35rem .9rem;
+    font-size: .78rem; color: var(--ink-dim);
+  }
+  .facts li::before { content: "·"; margin-right: .55rem; color: var(--rule); }
+  .facts li:first-child::before { content: none; }
+
+  footer {
+    margin-top: 3.4rem; padding-top: 1.8rem;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-dim); font-size: .92rem;
+  }
+  footer a { color: var(--accent); }
+  .note { margin-top: 1.1rem; font-size: .85rem; line-height: 1.6; }
+
+  @media (max-width: 30rem) {
+    .wrap { padding-top: 3rem; }
+    .lede { font-size: 1.08rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Jeremy Wang</h1>
+    <p class="lede">
+      Interactive explainers for the failure modes a static diagram cannot show.
+      <strong>One HTML file each. No libraries, no build step, no network requests.</strong>
+    </p>
+  </header>
+
+  <h2>The work</h2>
+
+  <a class="piece" href="hydrogen-embrittlement.html">
+    <h3>Hydrogen embrittlement <span class="go">→</span></h3>
+    <p>
+      A plated bolt passes every external inspection right up to the moment it fails.
+      Pull the joint apart and watch the hydrogen gather at the first engaged thread —
+      while the outside shows nothing at all.
+    </p>
+    <ul class="facts">
+      <li>one file</li>
+      <li>290&nbsp;KB</li>
+      <li>zero network requests</li>
+      <li>keyboard and screen-reader operable</li>
+    </ul>
+  </a>
+
+  <a class="piece" href="water-hammer.html">
+    <h3>Water hammer <span class="go">&rarr;</span></h3>
+    <p>
+      Shut a valve on a moving column of water and the pressure spike that follows
+      is set by how fast you shut it &mdash; not by how hard the pump was pushing.
+      Close it yourself, fast or slow, and watch the wave run the pipe.
+    </p>
+    <ul class="facts">
+      <li>one file</li>
+      <li>zero network requests</li>
+      <li>method of characteristics, solved live</li>
+      <li>checks run in the page</li>
+    </ul>
+  </a>
+
+  <h2>How they are made</h2>
+
+  <a class="piece" href="the-bolt-that-was-fine.html">
+    <h3>The bolt that was fine <span class="go">→</span></h3>
+    <p>
+      How that piece was built, including the five things that shipped wrong and the
+      instruments that caught them. The method, not the highlight reel.
+    </p>
+    <ul class="facts">
+      <li>case study</li>
+      <li>155 assertions in the acceptance gate</li>
+      <li>127 commits</li>
+    </ul>
+  </a>
+
+  <footer>
+    <p>
+      If one of these is your failure mode — a mechanism or a process people keep
+      getting wrong because the diagram cannot move — I build them to order.
+      <a href="mailto:yinxueshi1017@gmail.com">yinxueshi1017@gmail.com</a>
+    </p>
+    <p class="note">
+      The physics in these pieces is checked against published standards, but has not
+      been reviewed by an independent engineer. Each piece says so on its own page.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

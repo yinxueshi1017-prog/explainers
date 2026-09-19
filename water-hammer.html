@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water Hammer</title>
+<meta name="description" content="Close a valve and watch the surge. The pressure rise is set by how fast you shut it and by the speed of sound in the pipe — not by how hard the pump was pushing.">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. Software-simulated
+  water hammer (method of characteristics) drawn into SVG — no canvas, no WebGL,
+  so it renders on integrated graphics and degrades predictably.
+
+  THE ARGUMENT: the surge is set by the velocity you removed and the speed the
+  pipe can answer at. It is NOT set by the static pressure. A pump at low
+  pressure and a pump at high pressure produce the SAME rise for the same
+  velocity change, which is why "it's only a low-pressure line" is not a defence.
+  The second claim is the one the drawing exists to make: "slowly" means slowly
+  compared to the pipe's own round trip, which on a long line is seconds.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:   #0e1114;
+    --card:     #141a20;
+    --ink:      #cbd5dd;
+    --ink-dim:  #7d8fa0;
+    --ink-lede: #9fb0c0;
+    --rule:     #2a3138;
+    --rule-soft:#1e242a;
+    --accent:   #93a9c0;
+    --focus:    #e0864a;
+  }
+  /* PINNED DARK to sit with the rest of the site — see index.html. The
+     drawing's own colours (the cool water, the one saturated surge) were
+     chosen against this ground, so there is no second palette to keep honest.
+     Paper is the exception, for the reason the hydrogen piece gives: the
+     print dialog drops the ground and would leave pale ink on white. */
+  @media print {
+    :root {
+      --ground:   #ffffff;
+      --card:     #ffffff;
+      --ink:      #1a1f24;
+      --ink-dim:  #43505c;
+      --ink-lede: #1a1f24;
+      --rule:     #8d97a1;
+      --rule-soft:#c8ced4;
+      --accent:   #1a1f24;
+      --focus:    #1a1f24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+
+  h1 { font-size: 1.02rem; font-weight: 600; letter-spacing: .075em;
+       text-transform: uppercase; margin: 0 0 .85rem; }
+  .how { color: var(--ink-lede); margin: 0 0 1.3rem; font-size: .97rem; max-width: 46rem; }
+
+  /* The stage. Both drawings share it so the trace reads as part of the
+     same instrument as the pipe, not as a separate figure. */
+  .stage { border: 1px solid var(--rule); border-radius: 3px;
+           background: var(--card); padding: .6rem .6rem .35rem; }
+  svg { display: block; width: 100%; height: auto; }
+
+  #wh-view { touch-action: none; cursor: ns-resize; border-radius: 2px; }
+  /* In user units, so it scales with the drawing — which is exactly the
+     problem on a phone, where the 1000-unit viewBox is squeezed to 375px and
+     13 units lands at about five pixels. Sized here so the narrow case can
+     have its own value. */
+  #wh-view .lbl { font-size: 15px; }
+  @media (max-width: 34rem) { #wh-view .lbl { font-size: 30px; } }
+  #wh-view:focus { outline: none; }
+  #wh-view:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .cap { display: flex; justify-content: space-between; gap: 1rem;
+         color: var(--ink-dim); font-size: .78rem; margin: .5rem .2rem 0; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+         margin: .9rem 0 0; }
+  button {
+    font: inherit; font-size: .85rem; color: var(--ink);
+    background: transparent; border: 1px solid var(--rule);
+    border-radius: 3px; padding: .32rem .7rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--ground);
+                                border-color: var(--ink); }
+
+  /* The live region carries the whole argument for anyone not watching the
+     picture, so it is reserved at four lines and never allowed to reflow the
+     controls out from under a thumb mid-gesture. */
+  .live { color: var(--ink-lede); font-size: .95rem; margin: .9rem 0 0;
+          min-height: 4.8em; max-width: 48rem; }
+
+  h2 { font-size: .78rem; font-weight: 600; letter-spacing: .1em;
+       text-transform: uppercase; color: var(--ink-dim);
+       margin: 2.8rem 0 .9rem; }
+  p.body { max-width: 44rem; margin: 0 0 1rem; }
+  .note { color: var(--ink-dim); font-size: .9rem; max-width: 44rem; }
+  ul.note { padding-left: 1.1rem; }
+  ul.note li { margin-bottom: .45rem; }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--rule);
+           color: var(--ink-dim); font-size: .9rem; }
+  a { color: var(--accent); }
+
+  @media (max-width: 34rem) {
+    .wrap { padding-top: 1.7rem; }
+    .cap { font-size: .72rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Water hammer — shut a valve and watch what the pipe does</h1>
+
+  <p class="how" id="wh-how">
+    Drag downward to close the valve; drag up to open it again. The arrow keys do
+    the same, a step at a time. <strong>End slams it shut</strong>; Home reopens it.
+    How fast you close it is the whole experiment. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <!-- The drawing IS the control. Its accessible name is the physical question
+         the control asks, and aria-valuetext is in words: nothing announced
+         carries a digit. -->
+    <svg id="wh-view" viewBox="0 0 1000 470" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="100" aria-valuetext="wide open"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="wh-how"
+         aria-label="The valve at the end of the pipe — how far it is closed"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Above the pipe: the pressure head, drawn as a line. Level = calm.</span>
+      <span>Reservoir at left, valve at right.</span>
+    </div>
+
+    <!-- Not a control: a chart of what already happened at the valve. -->
+    <svg id="wh-trace" viewBox="0 0 1000 150" role="img"
+         aria-label="A record of the pressure at the valve over the last several seconds."></svg>
+    <div class="cap">
+      <span>Pressure at the valve, most recent at the right.</span>
+      <span id="wh-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="wh-sound" aria-pressed="false">Sound</button>
+    <button id="wh-reset">Reset</button>
+  </div>
+
+  <p class="live" id="wh-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Water in a long pipe is moving. You shut the valve at the end of it. The water
+    immediately behind the valve stops — and the water behind <em>that</em> does not
+    know yet. It keeps arriving, and it compresses against what has already stopped.
+    That compression is a pressure wave, and it runs back up the pipe at the speed of
+    sound in the water column, around 1200 metres a second in a steel line.
+  </p>
+  <p class="body">
+    At the reservoir the wave has nowhere to push, so it reflects and comes back
+    inverted. The pressure at the valve swings high, then low, then high again,
+    decaying only as friction eats it. The bang you hear is the pipe being hit by its
+    own contents.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>The rise does not depend on how hard the pump was pushing.</strong> It is
+    set by the velocity you removed and by the speed the pipe answers at. The same
+    valve on a gentle low-pressure line produces the same rise. "It is only a
+    low-pressure system" is not a defence.
+  </p>
+  <p class="body">
+    <strong>"Slowly" means slowly compared to the pipe's own round trip.</strong>
+    Shut the valve before the wave has been to the reservoir and back, and you get the
+    whole surge — there was nothing to relieve it. Take longer than that and the
+    returning wave arrives while you are still closing, and cancels part of the rise.
+    On this pipe the round trip is about a second. On a long transmission main it can
+    be several. A valve that feels unhurried to a hand can still be instantaneous to
+    the pipe.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The model is the standard
+      method of characteristics and the numbers it produces agree with the closed-form
+      results to the tolerances asserted in the built-in checks — but that check is the
+      author's own, not a hydraulic engineer's.</li>
+    <li><strong>Friction is steady-state only.</strong> Real transients lose energy
+      faster than this, because the friction during a reversal is not the friction of
+      steady flow. The ringing here therefore lasts longer than it would in a real pipe.</li>
+    <li><strong>Column separation is not modelled.</strong> When the pressure would
+      fall below the vapour pressure of water, this clamps it. A real pipe forms a
+      vapour cavity there and the slam when it collapses can exceed the first surge.
+      That is a more dangerous phenomenon than the one drawn, and it is out of scope.</li>
+    <li><strong>The pipe is rigid, straight and uniform</strong>, with a single wave
+      speed and no entrained air. Air, bends, branches and flexible sections all change
+      the answer, usually by lowering the wave speed.</li>
+    <li><strong>The valve law is a plain orifice</strong> closing in proportion to your
+      gesture. Real valve characteristics are strongly non-linear near shut, and most of
+      the velocity change happens in the last part of the travel.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE PIPE, AND WHY THESE NUMBERS
+
+     Chosen so the round trip is exactly one second, which is a duration a
+     hand can feel. Everything else follows from ordinary practice.
+     ================================================================== */
+
+  var L   = 600;    /* m, reservoir to valve — a modest transmission main    */
+  var A   = 1200;   /* m/s wave speed. Water in a steel pipe of ordinary
+                       wall ratio: the textbook band is 1000-1400. Entrained
+                       air drops it hard, which is why the notes say so.     */
+  var V0  = 2.0;    /* m/s initial velocity — a normal design velocity       */
+  var H0  = 50;     /* m, reservoir head above the pipe (about 5 bar)        */
+  var D   = 0.3;    /* m bore                                                */
+  var FD  = 0.02;   /* Darcy friction factor, commercial steel at this Re    */
+  var G   = 9.81;
+  var N   = 60;     /* reaches. dt = dx/a = 8.33 ms, so 120 solver steps per
+                       second of wall clock — the simulation runs REAL TIME,
+                       which is the whole point: your gesture is the input.  */
+
+  var DX  = L / N;
+  var DT  = DX / A;
+  var B   = A / G;                     /* characteristic impedance, in metres of
+                                          head per metre/second of velocity   */
+  var Rf  = FD * DX / (2 * G * D);     /* friction coefficient per reach      */
+
+  /* Joukowsky: the rise for a velocity change removed faster than the pipe
+     can answer. dH = a*dV/g. Note what is absent from it: H0. The surge does
+     not care what the static pressure was. */
+  var DJ  = A * V0 / G;                /* 244.6 m — about 24 bar             */
+  var TR  = 2 * L / A;                 /* 1.00 s — there and back            */
+  var HF  = FD * (L / D) * V0 * V0 / (2 * G);  /* 8.15 m steady friction loss */
+  var HV0 = H0 - HF;                   /* steady head AT the valve            */
+  var HVAP = -10.0;                    /* gauge head at which water boils.
+                                          Clamped, not modelled — see notes.  */
+
+  /* ==================================================================
+     2. THE SOLVER — method of characteristics (Wylie & Streeter)
+
+     Along dx/dt = +a:  H - H_A + B(V - V_A) + R V_A|V_A| = 0
+     Along dx/dt = -a:  H - H_B - B(V - V_B) - R V_B|V_B| = 0
+
+     which is the whole of it. The grid is chosen so the characteristics land
+     exactly on nodes (dt = dx/a), so there is NO interpolation error here —
+     the discretisation is exact for the frictionless part.
+     ================================================================== */
+
+  var H = new Float64Array(N + 1);
+  var V = new Float64Array(N + 1);
+  var Hn = new Float64Array(N + 1);
+  var Vn = new Float64Array(N + 1);
+  var Hs = new Float64Array(N + 1);   /* the steady grade, for colouring */
+
+  function setSteady() {
+    for (var i = 0; i <= N; i++) {
+      Hs[i] = H0 - HF * (i / N);
+      H[i] = Hs[i];
+      V[i] = V0;
+    }
+  }
+
+  /* One solver step. tau is the valve opening, 1 open, 0 shut. */
+  function step(tau) {
+    var i, CP, CM;
+
+    for (i = 1; i < N; i++) {
+      CP = H[i - 1] + B * V[i - 1] - Rf * V[i - 1] * Math.abs(V[i - 1]);
+      CM = H[i + 1] - B * V[i + 1] + Rf * V[i + 1] * Math.abs(V[i + 1]);
+      Hn[i] = 0.5 * (CP + CM);
+      Vn[i] = 0.5 * (CP - CM) / B;
+    }
+
+    /* THE RESERVOIR HOLDS ITS HEAD. It is large enough that the wave cannot
+       lift it, which is exactly why the wave comes back inverted: the
+       boundary insists on a head the arriving wave disagrees with. */
+    CM = H[1] - B * V[1] + Rf * V[1] * Math.abs(V[1]);
+    Hn[0] = H0;
+    Vn[0] = (H0 - CM) / B;
+
+    /* THE VALVE. Orifice: V = tau * V0 * sqrt(H / HV0), solved together with
+       the arriving C+ characteristic. Substituting gives a quadratic in
+       x = sqrt(H), which has one positive root. */
+    CP = H[N - 1] + B * V[N - 1] - Rf * V[N - 1] * Math.abs(V[N - 1]);
+    if (tau <= 1e-9) {
+      /* Shut. V = 0, so H is whatever the characteristic carries — and that
+         is Joukowsky falling out of the arithmetic rather than being asserted:
+         H = CP = H_A + B*V_A, a rise of B*V0 = a*V0/g. */
+      Vn[N] = 0;
+      Hn[N] = CP;
+    } else if (CP <= 0) {
+      Hn[N] = HVAP;
+      Vn[N] = (CP - HVAP) / B;
+    } else {
+      var k = B * tau * V0 / Math.sqrt(HV0);
+      var x = 0.5 * (-k + Math.sqrt(k * k + 4 * CP));
+      Hn[N] = x * x;
+      Vn[N] = tau * V0 * Math.sqrt(Hn[N] / HV0);
+    }
+
+    for (i = 0; i <= N; i++) {
+      /* CLAMP, NOT A MODEL. See "what is not verified": a real pipe opens a
+         vapour cavity here and the collapse can beat the first surge. */
+      H[i] = Hn[i] < HVAP ? HVAP : Hn[i];
+      V[i] = Vn[i];
+    }
+  }
+
+  /* ==================================================================
+     3. GEOMETRY OF THE DRAWING
+     ================================================================== */
+
+  var X0 = 150, X1 = 900;              /* pipe run, in view units           */
+  var PIPE_T = 372, PIPE_B = 410;      /* pipe walls                        */
+  var GRAPH_T = 24, GRAPH_B = 348;     /* the head plot lives here          */
+  var HMAX = H0 + DJ * 1.15;
+  var HMIN = -30;
+
+  function xAt(i) { return X0 + (X1 - X0) * (i / N); }
+  function yHead(h) {
+    var t = (h - HMIN) / (HMAX - HMIN);
+    if (t < -0.05) t = -0.05; if (t > 1.05) t = 1.05;
+    return GRAPH_B - t * (GRAPH_B - GRAPH_T);
+  }
+
+  /* ONE SATURATED COLOUR ON THE DRAWING, and it is the overpressure: the
+     single thing the piece is about. Everything else is the cool grey-blue of
+     water and steel, so the eye has nowhere else to go. Downsurge gets a dark
+     indigo rather than a second saturated hue — it is an absence, and it
+     should read as one. */
+  var COOL = [122, 146, 168];
+  var HOT  = [224,  86,  40];
+  var VOID = [ 26,  34,  58];
+
+  function mix(a, b, t) {
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+                    Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+                    Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  function headColour(h, hs) {
+    var t = (h - hs) / DJ;
+    if (t >= 0) return mix(COOL, HOT, Math.pow(Math.min(1, t), 0.72));
+    return mix(COOL, VOID, Math.pow(Math.min(1, -t), 0.72));
+  }
+
+  /* ==================================================================
+     4. BUILDING THE SVG ONCE, THEN ONLY WRITING ATTRIBUTES
+
+     Nodes are created here and never again. Per frame we write fills on 60
+     rects and points on two polylines — a fixed cost that does not grow.
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('wh-view');
+  var trace = document.getElementById('wh-trace');
+
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  /* -- reservoir -------------------------------------------------------- */
+  var resTop = yHead(H0);
+  el('rect', { x: 30, y: resTop, width: 120, height: 430 - resTop,
+               fill: 'rgb(96,118,140)', opacity: '.55' });
+  el('path', { d: 'M30 ' + (resTop - 14) + ' L30 430 L150 430',
+               fill: 'none', stroke: 'currentColor', 'stroke-width': 2,
+               opacity: '.5' });
+  el('line', { x1: 30, y1: resTop, x2: 150, y2: resTop,
+               stroke: 'rgb(150,172,190)', 'stroke-width': 1.5 });
+
+  /* -- reference grades -------------------------------------------------
+     The static grade and the Joukowsky ceiling. These are the only two
+     comparisons the piece needs, and both are drawn rather than printed:
+     no digits anywhere on the picture. */
+  el('line', { x1: X0, y1: yHead(H0), x2: 996, y2: yHead(H0),
+               stroke: 'currentColor', 'stroke-width': 1,
+               'stroke-dasharray': '2 5', opacity: '.42' });
+  el('text', { x: 996, y: yHead(H0) - 6, fill: 'currentColor', 'text-anchor': 'end',
+               'class': 'lbl', opacity: '.6' }).textContent = 'at rest';
+
+  el('line', { x1: X0, y1: yHead(HV0 + DJ), x2: 996, y2: yHead(HV0 + DJ),
+               stroke: 'rgb(224,86,40)', 'stroke-width': 1,
+               'stroke-dasharray': '2 5', opacity: '.6' });
+  el('text', { x: 996, y: yHead(HV0 + DJ) - 6, fill: 'rgb(224,86,40)', 'text-anchor': 'end',
+               'class': 'lbl', opacity: '.9' }).textContent = 'full surge';
+
+  /* -- the head line ---------------------------------------------------- */
+  var grade = el('polyline', { fill: 'none', stroke: 'rgb(190,205,218)',
+                               'stroke-width': 2.5, 'stroke-linejoin': 'round' });
+  var gradeFill = el('polygon', { fill: 'rgb(140,165,190)', opacity: '.13' });
+  view.insertBefore(gradeFill, grade);
+
+  /* -- the pipe --------------------------------------------------------- */
+  var segs = [], si;
+  for (si = 0; si < N; si++) {
+    segs.push(el('rect', { x: xAt(si) - 0.4, y: PIPE_T,
+                           width: (X1 - X0) / N + 0.8, height: PIPE_B - PIPE_T,
+                           fill: 'rgb(122,146,168)' }));
+  }
+  el('line', { x1: X0, y1: PIPE_T, x2: X1, y2: PIPE_T,
+               stroke: 'currentColor', 'stroke-width': 1.5, opacity: '.55' });
+  el('line', { x1: X0, y1: PIPE_B, x2: X1, y2: PIPE_B,
+               stroke: 'currentColor', 'stroke-width': 1.5, opacity: '.55' });
+
+  /* -- the valve --------------------------------------------------------
+     A gate that descends into the bore. It is the only moving thing the
+     reader controls, so it is drawn plainly and its travel is the full bore:
+     what you see closed IS closed. */
+  el('rect', { x: X1, y: PIPE_T - 8, width: 34, height: (PIPE_B - PIPE_T) + 16,
+               fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5,
+               opacity: '.6' });
+  var gate = el('rect', { x: X1 + 8, y: PIPE_T, width: 18, height: 1,
+                          fill: 'currentColor', opacity: '.82' });
+  var stem = el('line', { x1: X1 + 17, y1: PIPE_T - 40, x2: X1 + 17, y2: PIPE_T,
+                          stroke: 'currentColor', 'stroke-width': 3, opacity: '.7' });
+  el('rect', { x: X1 + 2, y: PIPE_T - 52, width: 30, height: 9, rx: 2,
+               fill: 'currentColor', opacity: '.55' });
+
+  /* discharge downstream of the valve — it just leaves */
+  el('path', { d: 'M' + (X1 + 34) + ' ' + PIPE_T + ' L960 ' + PIPE_T +
+                  ' M' + (X1 + 34) + ' ' + PIPE_B + ' L960 ' + PIPE_B,
+               stroke: 'currentColor', 'stroke-width': 1.5, opacity: '.35',
+               fill: 'none' });
+  var jet = el('rect', { x: X1 + 34, y: PIPE_T, width: 26, height: PIPE_B - PIPE_T,
+                         fill: 'rgb(122,146,168)', opacity: '.75' });
+
+  /* -- the wave front marker -------------------------------------------
+     Drawn where the head gradient is steepest. Without it the eye reads the
+     colour as a glow rather than as something ARRIVING at a definite speed,
+     and the speed is the entire mechanism. */
+  var front = el('line', { x1: X0, y1: PIPE_T - 14, x2: X0, y2: PIPE_B + 14,
+                           stroke: 'rgb(224,86,40)', 'stroke-width': 2,
+                           opacity: '0' });
+
+  /* -- the trace -------------------------------------------------------- */
+  var TSPAN = 12;                       /* seconds visible                  */
+  var tracePts = el('polyline', { fill: 'none', stroke: 'rgb(190,205,218)',
+                                  'stroke-width': 2 }, trace);
+  var tracePrev = el('polyline', { fill: 'none', stroke: 'currentColor',
+                                   'stroke-width': 1.5, opacity: '.28',
+                                   'stroke-dasharray': '3 4' }, trace);
+  el('line', { x1: 0, y1: 150 - (H0 - HMIN) / (HMAX - HMIN) * 150,
+               x2: 1000, y2: 150 - (H0 - HMIN) / (HMAX - HMIN) * 150,
+               stroke: 'currentColor', 'stroke-width': 1,
+               'stroke-dasharray': '2 5', opacity: '.4' }, trace);
+  el('line', { x1: 0, y1: 150 - (HV0 + DJ - HMIN) / (HMAX - HMIN) * 150,
+               x2: 1000, y2: 150 - (HV0 + DJ - HMIN) / (HMAX - HMIN) * 150,
+               stroke: 'rgb(224,86,40)', 'stroke-width': 1,
+               'stroke-dasharray': '2 5', opacity: '.55' }, trace);
+
+  function yTrace(h) {
+    var t = (h - HMIN) / (HMAX - HMIN);
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    return 150 - t * 150;
+  }
+
+  /* ==================================================================
+     5. STATE
+     ================================================================== */
+
+  var tau = 1, tauPrev = 1;
+  var simT = 0;
+  var peakEnv = new Float64Array(N + 1);
+  var staticView = false;        /* true only in the reduced-motion branch */
+  var hist = [], histPrev = null;
+  var peak = HV0, peakPrev = null;
+  var closing = false, closedAt = -1, closeStart = -1, lastTc = -1;
+
+  /* THE VERDICT IS TIMED ON THE WALL CLOCK, NOT THE SIMULATION CLOCK.
+     What the piece tells you is a judgement about the gesture you just made,
+     and you made it in real seconds. If the tab is throttled the picture has
+     to skip — but a reader must not be told they slammed a valve they in fact
+     closed slowly, merely because their machine was busy. */
+  function nowS() { return (window.performance ? performance.now() : Date.now()) / 1000; }
+  var settled = false;
+
+  var reduce = false;
+  try {
+    reduce = window.matchMedia &&
+             window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) { reduce = false; }
+  /* A BRANCH THAT CANNOT BE OPENED CANNOT BE CHECKED. #reduce forces the
+     reduced-motion path so it can be looked at on a machine whose OS
+     preference is the other way — the same reason #dev exists. */
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  function reset(keepPrev) {
+    if (keepPrev && hist.length > 30) { histPrev = hist.slice(); peakPrev = peak; }
+    setSteady();
+    tau = tauPrev = 1; simT = 0; hist = []; peak = HV0;
+    closing = false; closedAt = -1; closeStart = -1; settled = false;
+    say('rest');
+    render();
+  }
+
+  /* ==================================================================
+     6. NARRATION — words, never digits
+
+     The comparison that matters is the reader's closure time against the
+     pipe's round trip, so that is what every line is about.
+     ================================================================== */
+
+  var SAY = {
+    rest: 'The valve is open and the water is moving steadily. Nothing here is ' +
+          'under any unusual pressure.',
+    closing: 'Closing. The water upstream cannot know yet — it is still arriving ' +
+             'at the speed it was.',
+    slam: 'Shut before the pipe could answer. The wave had not yet been to the ' +
+          'reservoir and back, so nothing arrived to relieve the rise, and you ' +
+          'have the whole of it. Note where the pressure went: far above the ' +
+          'level the reservoir could ever have supplied.',
+    brisk: 'Shut at about the pipe’s own round trip. The returning wave got ' +
+           'back just as you finished, so it took the top off the surge — but ' +
+           'only just.',
+    gentle: 'Shut slowly enough that the wave went to the reservoir and came back ' +
+            'while you were still closing. What came back was a relief, and it ' +
+            'cancelled most of the rise as you made it. Same valve, same water, ' +
+            'same velocity removed.',
+    ringing: 'The surge is running the pipe now, to the reservoir and back, ' +
+             'inverting at each end. Friction is the only thing taking it down.',
+    settled: 'The transient has died away and the water is at rest against a shut ' +
+             'valve. The pressure is back to the reservoir’s own, which is all ' +
+             'it ever was before you touched it.',
+    opening: 'Opening again. The flow re-establishes and the pipe goes quiet.'
+  };
+
+  var live = document.getElementById('wh-live');
+  var saidKey = null;
+  function say(key) {
+    if (key === saidKey) return;
+    saidKey = key;
+    live.textContent = SAY[key] || '';
+  }
+
+  var cmp = document.getElementById('wh-cmp');
+
+  /* ==================================================================
+     7. SOUND — opt in, and not built until a gesture has happened
+
+     The signature of water hammer is a knock each time the wave returns to
+     the valve, decaying as friction eats it. It is generated from the
+     simulation's own pressure swing, so it cannot drift out of step with the
+     picture: if the drawing is quiet, so is this.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false;
+  var lastKnock = 0, prevValve = HV0;
+
+  function ensureAudio() {
+    /* NO AUDIO WITHOUT A GESTURE, asserted rather than believed: the context
+       is not constructed at all until one has happened. */
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return;
+      audio = new C();
+    } catch (e) { audio = null; }
+  }
+
+  function knock(strength) {
+    if (!audio || !soundOn) return;
+    var now = audio.currentTime;
+    if (now - lastKnock < 0.12) return;
+    lastKnock = now;
+
+    var dur = 0.26;
+    var sr = audio.sampleRate;
+    var buf = audio.createBuffer(1, Math.floor(sr * dur), sr);
+    var ch = buf.getChannelData(0);
+    /* A struck pipe: noise through a fast decay, with a little low ring under
+       it. Not a synthesised "boing" — the character is mostly the envelope. */
+    for (var i = 0; i < ch.length; i++) {
+      var t = i / sr;
+      var env = Math.exp(-t * 26);
+      ch[i] = (Math.random() * 2 - 1) * env * 0.55 +
+              Math.sin(2 * Math.PI * 78 * t) * Math.exp(-t * 13) * 0.45;
+    }
+    var src = audio.createBufferSource();
+    src.buffer = buf;
+    var lp = audio.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 320 + 900 * strength;
+    var g = audio.createGain();
+    g.gain.value = Math.min(0.42, 0.05 + 0.4 * strength);
+    src.connect(lp); lp.connect(g); g.connect(audio.destination);
+    src.start();
+  }
+
+  /* ==================================================================
+     8. RENDER
+     ================================================================== */
+
+  var ptsA = [], ptsB = [];
+
+  function render() {
+    var i, h, maxGrad = 0, gradAt = -1;
+
+    /* pipe colour + steepest gradient, one pass */
+    for (i = 0; i < N; i++) {
+      h = 0.5 * (H[i] + H[i + 1]);
+      segs[i].setAttribute('fill', headColour(h, 0.5 * (Hs[i] + Hs[i + 1])));
+      var g2 = Math.abs(H[i + 1] - H[i]);
+      if (g2 > maxGrad) { maxGrad = g2; gradAt = i; }
+    }
+
+    /* head line */
+    ptsA.length = 0;
+    for (i = 0; i <= N; i++) ptsA.push(xAt(i) + ',' + yHead(H[i]).toFixed(1));
+    grade.setAttribute('points', ptsA.join(' '));
+    gradeFill.setAttribute('points',
+      X0 + ',' + PIPE_T + ' ' + ptsA.join(' ') + ' ' + X1 + ',' + PIPE_T);
+
+    /* the front, only while it is a real step rather than a smooth grade */
+    if (staticView) {
+      /* Nothing is moving, so a "wave front" marker would be a lie about
+         what the picture is showing. */
+      front.setAttribute('opacity', '0');
+    } else if (maxGrad > DJ * 0.05 && gradAt >= 0) {
+      front.setAttribute('x1', xAt(gradAt + 0.5));
+      front.setAttribute('x2', xAt(gradAt + 0.5));
+      front.setAttribute('opacity', '0.75');
+    } else {
+      front.setAttribute('opacity', '0');
+    }
+
+    /* the valve gate and its stem */
+    var open = PIPE_B - PIPE_T;
+    var shut = (1 - tau) * open;
+    gate.setAttribute('y', PIPE_T);
+    gate.setAttribute('height', Math.max(1, shut));
+    stem.setAttribute('y2', PIPE_T + shut);
+    jet.setAttribute('opacity', (0.12 + 0.63 * Math.max(0, V[N] / V0)).toFixed(3));
+
+    /* the trace */
+    if (hist.length > 1) {
+      ptsB.length = 0;
+      var span = TSPAN, t0 = Math.max(0, simT - span);
+      var stride = Math.max(1, Math.floor(hist.length / 500));
+      for (i = 0; i < hist.length; i += stride) {
+        var p = hist[i];
+        if (p[0] < t0) continue;
+        ptsB.push((((p[0] - t0) / span) * 1000).toFixed(1) + ',' + yTrace(p[1]).toFixed(1));
+      }
+      tracePts.setAttribute('points', ptsB.join(' '));
+    } else {
+      tracePts.setAttribute('points', '');
+    }
+
+    if (histPrev && histPrev.length > 1) {
+      ptsB.length = 0;
+      var s2 = Math.max(1, Math.floor(histPrev.length / 400));
+      var base = histPrev[0][0];
+      for (i = 0; i < histPrev.length; i += s2) {
+        var q = histPrev[i];
+        var xr = (q[0] - base) / TSPAN;
+        if (xr > 1) break;
+        ptsB.push((xr * 1000).toFixed(1) + ',' + yTrace(q[1]).toFixed(1));
+      }
+      tracePrev.setAttribute('points', ptsB.join(' '));
+      cmp.textContent = 'Dashed: your previous attempt.';
+    } else {
+      tracePrev.setAttribute('points', '');
+      cmp.textContent = '';
+    }
+
+    /* the control's own value, in words */
+    var pct = Math.round(tau * 100);
+    view.setAttribute('aria-valuenow', pct);
+    view.setAttribute('aria-valuetext',
+      tau <= 0.001 ? 'shut' :
+      tau < 0.18   ? 'nearly shut' :
+      tau < 0.55   ? 'part open' :
+      tau < 0.985  ? 'mostly open' : 'wide open');
+  }
+
+  /* ==================================================================
+     9. THE LOOP
+     ================================================================== */
+
+  var last = 0, carry = 0;
+
+  function advance(dtReal) {
+    /* A tab that was in the background must not "catch up" by running a
+       thousand steps at once: that is not a slower closure, it is a
+       different experiment. Cap and move on. */
+    if (dtReal > 0.25) dtReal = 0.25;
+    carry += dtReal;
+    var steps = Math.floor(carry / DT);
+    if (steps > 60) steps = 60;
+    carry -= steps * DT;
+    /* AND THE DEBT IS DROPPED, NOT BANKED. Capping the steps without also
+       discarding the unspent time leaves `carry` growing every slow frame,
+       so the simulation falls permanently further behind the clock and never
+       recovers. Measured at 2 fps in a throttled tab: the wave visibly ran in
+       slow motion. Better to lose the time outright and stay in step. */
+    if (carry > DT * 60) carry = 0;
+
+    for (var s = 0; s < steps; s++) {
+      /* interpolate the gesture across the sub-steps so a fast drag is a
+         ramp, not a staircase */
+      var f = (s + 1) / Math.max(1, steps);
+      var tauS = tauPrev + (tau - tauPrev) * f;
+      step(tauS);
+      simT += DT;
+
+      var hv = H[N];
+      hist.push([simT, hv]);
+      if (hist.length > 4000) hist.splice(0, hist.length - 4000);
+      if (hv > peak) peak = hv;
+
+      /* a knock each time the pressure at the valve turns over hard */
+      var d = hv - prevValve;
+      if (d < -DJ * 0.06 && prevValve - HV0 > DJ * 0.10) {
+        knock(Math.min(1, (prevValve - HV0) / DJ));
+      }
+      prevValve = hv;
+    }
+    tauPrev = tau;
+
+    /* narration state machine */
+    if (tau <= 0.001 && closedAt < 0) {
+      closedAt = simT;
+      lastTc = closeStart >= 0 ? (nowS() - closeStart) : 0;
+      /* THE COMPARISON THAT MATTERS is against the round trip, not against
+         any absolute idea of "fast". */
+      var ratio = lastTc / TR;
+      say(ratio < 0.85 ? 'slam' : ratio < 2.2 ? 'brisk' : 'gentle');
+    } else if (tau > 0.001 && closedAt >= 0) {
+      closedAt = -1; settled = false; say('opening');
+    } else if (closedAt >= 0) {
+      if (simT - closedAt > 1.2 && !settled) {
+        if (peak - HV0 < DJ * 0.04 && Math.abs(H[N] - H0) < 2.5) {
+          settled = true; say('settled');
+        } else if (simT - closedAt > 2.0) {
+          say('ringing');
+        }
+      }
+    } else if (closing) {
+      say('closing');
+    }
+  }
+
+  function frame(now) {
+    if (!last) last = now;
+    var dt = (now - last) / 1000;
+    last = now;
+    advance(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     10. INPUT — the gesture IS the physics
+
+     Nothing here computes a "closure time" and hands it to the solver. The
+     solver reads tau every step, so the shape of your hand's motion is the
+     shape of the valve's motion. That is the only reason this piece is worth
+     being interactive at all.
+     ================================================================== */
+
+  var dragging = false, y0 = 0, tau0 = 1;
+  var TRAVEL = 300;                    /* view units of drag for full travel */
+
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 470;
+  }
+
+  function setTau(t) {
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    if (t < 1 && tau >= 1 && closeStart < 0) { closeStart = nowS(); closing = true; }
+    if (t >= 1) { closeStart = -1; closing = false; }
+    tau = t;
+    if (reduce) reducedUpdate();
+  }
+
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); tau0 = tau;
+    view.setPointerCapture(ev.pointerId);
+    view.focus();
+    ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setTau(tau0 - (localY(ev) - y0) / TRAVEL);
+    ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, handled = true;
+    gestured = true; ensureAudio();
+    if (k === 'ArrowDown' || k === 'ArrowLeft') setTau(tau - 0.08);
+    else if (k === 'ArrowUp' || k === 'ArrowRight') setTau(tau + 0.08);
+    else if (k === 'End') { if (tau >= 1) closeStart = nowS(); setTau(0); }
+    else if (k === 'Home') setTau(1);
+    else if (k === 'PageDown') setTau(tau - 0.25);
+    else if (k === 'PageUp') setTau(tau + 0.25);
+    else handled = false;
+    if (handled) ev.preventDefault();
+  });
+
+  document.getElementById('wh-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true;
+    ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+  });
+
+  document.getElementById('wh-reset').addEventListener('click', function () {
+    reset(true);
+  });
+
+  /* ==================================================================
+     11. THE CHECKS
+
+     Run headless against the same solver the picture uses, so they cannot
+     drift apart from it. Visible at #dev; they also run silently on load and
+     complain in the console if the physics has moved.
+
+     Each is a closed-form result the method of characteristics must
+     reproduce. The last one is a NEGATIVE CONTROL: it feeds the solver a
+     wrong wave speed and asserts the first check would have caught it. An
+     instrument that cannot fail is not evidence.
+     ================================================================== */
+
+  /* Returns BOTH the rise at the instant of closure and the peak over the
+     run, because they are not the same number and conflating them cost this
+     file a failing gate.
+
+     The first step after a shut valve carries exactly H_A + B*V_A, and the
+     friction term cancels against the steady grade (R*V0^2 = HF/N is the head
+     lost across one reach), so the FIRST rise is Joukowsky to the digit.
+
+     THE PEAK IS HIGHER, and legitimately so: behind the front the column is
+     still arriving and still fighting friction, so it keeps packing pressure
+     in until the front reaches the reservoir. That is line packing, and it
+     scales with the steady friction loss — which is why the original check,
+     written against the peak, failed by almost exactly HF. */
+  function headless(tauFn, seconds, waveSpeed) {
+    var savedA = A, savedB = B, savedDT = DT;
+    if (waveSpeed) { A = waveSpeed; B = A / G; DT = DX / A; }
+    setSteady();
+    var t = 0, pk = -1e9, first = null, n = Math.floor(seconds / DT);
+    for (var i = 0; i < n; i++) {
+      step(tauFn(t));
+      t += DT;
+      if (first === null && tauFn(t) <= 1e-9) first = H[N];
+      if (H[N] > pk) pk = H[N];
+    }
+    A = savedA; B = savedB; DT = savedDT;
+    setSteady();
+    return { first: first === null ? pk : first, peak: pk };
+  }
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name +
+               '  got ' + got.toFixed(1) + (unit || ' m') +
+               ', expected ' + want.toFixed(1) + ' ± ' + tol.toFixed(1));
+      return pass;
+    }
+
+    /* 1. Joukowsky. The rise AT THE INSTANT of closure is a*V0/g exactly. */
+    var instant = headless(function () { return 0; }, 0.9);
+    chk('instant closure = Joukowsky', instant.first - HV0, DJ, DJ * 0.005);
+
+    /* 1b. LINE PACKING. The peak must then exceed that first rise, by an
+           amount of the order of the steady friction loss. Asserted as a
+           band rather than a value: it is a real effect and the piece should
+           notice if it ever disappears (which would mean friction had
+           silently stopped being integrated along the characteristics). */
+    var packing = instant.peak - instant.first;
+    if (packing > HF * 0.35 && packing < HF * 1.6) {
+      out.push('PASS  line packing above Joukowsky  got ' + packing.toFixed(1) +
+               ' m, expected between ' + (HF * 0.35).toFixed(1) +
+               ' and ' + (HF * 1.6).toFixed(1));
+    } else {
+      ok = false;
+      out.push('FAIL  line packing above Joukowsky  got ' + packing.toFixed(1) + ' m');
+    }
+
+    /* 2. Michaud: for a linear closure slower than the round trip, the peak
+          rise tends to 2LV0/(g*tc). Checked at eight round trips, where the
+          approximation is good. */
+    var tc = 8 * TR;
+    var slow = headless(function (t) { return t >= tc ? 0 : 1 - t / tc; }, tc + 1.2);
+    chk('slow closure = Michaud', slow.peak - HV0, 2 * L * V0 / (G * tc), 2 * L * V0 / (G * tc) * 0.20);
+
+    /* 3. The surge must be blind to static head. Same velocity change on a
+          reservoir at more than twice the head must give the same RISE.
+          This is the claim the prose makes, so it is the claim most worth
+          holding to an assertion. */
+    var savedH0 = H0, savedHV0 = HV0;
+    H0 = 120; HV0 = H0 - HF;
+    var high = headless(function () { return 0; }, 0.9);
+    var riseHigh = high.first - HV0;
+    H0 = savedH0; HV0 = savedHV0;
+    setSteady();
+    chk('rise independent of static head', riseHigh, DJ, DJ * 0.005);
+
+    /* 4. Period. The pressure at a valve shut instantly is periodic at 4L/a. */
+    setSteady();
+    var t2 = 0, series = [], n2 = Math.floor((4 * TR) / DT);
+    for (var i = 0; i < n2; i++) { step(0); t2 += DT; series.push([t2, H[N]]); }
+    var firstDrop = -1, i2;
+    for (i2 = 1; i2 < series.length; i2++) {
+      if (series[i2][1] < HV0 + DJ * 0.5) { firstDrop = series[i2][0]; break; }
+    }
+    setSteady();
+    chk('first reversal at 2L/a', firstDrop, TR, TR * 0.12, ' s');
+
+    /* 5. NEGATIVE CONTROL. Halve the wave speed and check that test 1 would
+          have FAILED — proving it can see a difference at all. */
+    var wrong = headless(function () { return 0; }, 0.9, A / 2);
+    var caught = Math.abs((wrong.first - HV0) - DJ) > DJ * 0.005;
+    if (!caught) ok = false;
+    out.push((caught ? 'PASS  ' : 'FAIL  ') +
+             'negative control: wrong wave speed is caught by check 1');
+
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11b. REDUCED MOTION — the payoff without the motion
+
+     THE OSCILLATION IS THE THING THAT MOVES, so under a reduced-motion
+     preference it is the thing that goes. It is not enough to swap
+     requestAnimationFrame for a timer: that animates exactly as much, and
+     merely lies about it in the comment.
+
+     So instead the whole transient is solved in one synchronous pass the
+     moment the valve reaches shut, and what is drawn is the ENVELOPE — the
+     highest pressure each part of the pipe reached at any point during the
+     run. The payoff is fully reachable: you still shut the valve, you still
+     get the surge, the trace still shows the reversals, and the verdict on
+     your closure time is unchanged. Nothing animates to deliver it.
+     ================================================================== */
+
+  function runReduced(tc) {
+    var i, sIdx;
+    setSteady();
+    for (i = 0; i <= N; i++) peakEnv[i] = H[i];
+    hist = []; simT = 0; peak = HV0;
+
+    var horizon = Math.max(TSPAN, tc + 3);
+    var n = Math.floor(horizon / DT);
+    for (sIdx = 0; sIdx < n; sIdx++) {
+      var tt = sIdx * DT;
+      var tv = tc <= 1e-6 ? 0 : Math.max(0, 1 - tt / tc);
+      step(tv);
+      simT += DT;
+      hist.push([simT, H[N]]);
+      if (H[N] > peak) peak = H[N];
+      for (i = 0; i <= N; i++) if (H[i] > peakEnv[i]) peakEnv[i] = H[i];
+    }
+
+    /* Draw the envelope, not the final state: the final state is calm, and
+       calm is not what the reader came for. */
+    for (i = 0; i <= N; i++) { H[i] = peakEnv[i]; V[i] = 0; }
+    staticView = true;
+  }
+
+  function reducedUpdate() {
+    if (tau > 0.001) {
+      staticView = false;
+      setSteady();
+      hist = []; simT = 0; peak = HV0;
+      say(closeStart >= 0 ? 'closing' : 'rest');
+      render();
+      return;
+    }
+    var tc = closeStart >= 0 ? (nowS() - closeStart) : 0;
+    var ratio = tc / TR;
+    runReduced(tc);
+    render();
+    saidKey = null;
+    live.textContent = SAY[ratio < 0.85 ? 'slam' : ratio < 2.2 ? 'brisk' : 'gentle'] +
+      ' Motion is reduced here, so the line shows the highest pressure each part ' +
+      'of the pipe reached, rather than animating the wave that got there.';
+  }
+
+  /* ==================================================================
+     12. GO
+     ================================================================== */
+
+  setSteady();
+  reset(false);
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('water-hammer: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) {
+    say('rest');
+    render();
+  } else {
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
