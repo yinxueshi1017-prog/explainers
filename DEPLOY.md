@@ -55,16 +55,23 @@ the domain at the host in that host's dashboard — DNS is the only step.
   print dialogs drop CSS backgrounds and would otherwise leave pale ink on white paper.
   If you add a page: dark by default, light for print, no OS-preference branch.
 
-## Known issue, your call
+## Fonts
 
-`the-bolt-that-was-fine.html` loads IBM Plex from `fonts.googleapis.com` — three external
-requests on a page that argues for making none. Options:
+`the-bolt-that-was-fine.html` used to pull IBM Plex from `fonts.googleapis.com` — three
+external requests on a page that argues for making none. The five faces the page actually
+sets are now embedded as base64 woff2 (latin subsets): Sans Condensed 600/700, Sans 400,
+Mono 400/500. The page costs ~88 KB more and asks nothing of a third party.
 
-1. Leave it. The zero-network claim is about the explainer, not the case study, so it is
-   not strictly a contradiction — but a sharp reader may notice.
-2. Swap to a system font stack. One line changed, no external requests, slightly
-   different typography.
-3. Self-host the woff2 files. Keeps the exact typeface, adds ~100 KB to the folder,
-   IBM Plex is OFL-licensed so this is permitted.
+IBM Plex is (c) 2017 IBM Corp under the SIL Open Font License 1.1. `LICENSE-IBM-Plex.txt`
+ships beside the pages because the OFL requires the licence to travel with the fonts —
+**do not delete it.**
 
-Say which and it is a two-minute change.
+If you ever add a weight to that page, embed the matching face too. A weight with no face
+is silently faux-bolded by the browser, which looks wrong at headline sizes and gives no
+error.
+
+## No external requests anywhere
+
+Verified on the live origin: every page loads zero off-origin resources. If you add
+anything that fetches — a font, a script, an analytics tag, an embedded video — either
+remove it or remove the claim from the pages, because the claim is printed on them.
