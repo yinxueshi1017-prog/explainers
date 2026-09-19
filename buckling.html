@@ -69,6 +69,30 @@
   a { color: var(--accent); }
   @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
 </style>
+
+<!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----
+  A link pasted into Slack, LinkedIn or a mail client renders from these, and
+  without them it renders as a bare grey URL. The preview image is a real PNG
+  at an absolute URL because that is the only thing a scraper will take — a
+  data: URI is not fetched and SVG is rejected by most of them.
+
+  This does NOT put a request into the page. og:image is fetched by the
+  crawler that unfurls the link, never by the reader's browser, so the page
+  still loads with nothing off-origin. -->
+<link rel="canonical" href="https://yinxueshi1017-prog.github.io/explainers/buckling.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Interactive explainers">
+<meta property="og:title" content="Buckling">
+<meta property="og:description" content="Make a strut slender enough and the grade of steel stops mattering entirely. Three grades, three capacities — and past a certain slenderness they are the same number.">
+<meta property="og:url" content="https://yinxueshi1017-prog.github.io/explainers/buckling.html">
+<meta property="og:image" content="https://yinxueshi1017-prog.github.io/explainers/og/buckling.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark title card reading “Buckling”.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Buckling">
+<meta name="twitter:description" content="Make a strut slender enough and the grade of steel stops mattering entirely. Three grades, three capacities — and past a certain slenderness they are the same number.">
+<meta name="twitter:image" content="https://yinxueshi1017-prog.github.io/explainers/og/buckling.png">
 </head>
 <body>
 <div class="wrap">
@@ -165,6 +189,11 @@
     of problem this suits. You get one file, the checks that hold it honest, and the notes
     explaining every decision including the ones that were reversed.
     <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+    <br><br>
+    Not commissioning anything? Still worth an email. If your version of this failed
+    differently &mdash; other geometry, other numbers, a mechanism this piece leaves out &mdash;
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Buckling%20%E2%80%94%20what%20this%20leaves%20out&amp;body=Where%20this%20differs%20from%20what%20I%20see%20in%20the%20field%3A%0A%0A">tell me in one line</a>.
+    Corrections are the main thing that decides what gets built next.
   </p>
 
   <footer>

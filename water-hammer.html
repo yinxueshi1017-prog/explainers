@@ -120,6 +120,30 @@
   }
 </style>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M2%209.4H8.2V3.6H14%22%20fill%3D%22none%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%2211.4%22%20width%3D%2212%22%20height%3D%222.4%22%20rx%3D%220.5%22%20fill%3D%22%237a92a8%22%2F%3E%3C%2Fsvg%3E">
+
+<!-- ---- HOW THIS LOOKS WHEN SOMEBODY FORWARDS IT ----
+  A link pasted into Slack, LinkedIn or a mail client renders from these, and
+  without them it renders as a bare grey URL. The preview image is a real PNG
+  at an absolute URL because that is the only thing a scraper will take — a
+  data: URI is not fetched and SVG is rejected by most of them.
+
+  This does NOT put a request into the page. og:image is fetched by the
+  crawler that unfurls the link, never by the reader's browser, so the page
+  still loads with nothing off-origin. -->
+<link rel="canonical" href="https://yinxueshi1017-prog.github.io/explainers/water-hammer.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Interactive explainers">
+<meta property="og:title" content="Water Hammer">
+<meta property="og:description" content="Close a valve and watch the surge. The pressure rise is set by how fast you shut it and by the speed of sound in the pipe — not by how hard the pump was pushing.">
+<meta property="og:url" content="https://yinxueshi1017-prog.github.io/explainers/water-hammer.html">
+<meta property="og:image" content="https://yinxueshi1017-prog.github.io/explainers/og/water-hammer.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark title card reading “Water Hammer”.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Water Hammer">
+<meta name="twitter:description" content="Close a valve and watch the surge. The pressure rise is set by how fast you shut it and by the speed of sound in the pipe — not by how hard the pump was pushing.">
+<meta name="twitter:image" content="https://yinxueshi1017-prog.github.io/explainers/og/water-hammer.png">
 </head>
 <body>
 <div class="wrap">
@@ -228,6 +252,11 @@
     of problem this suits. You get one file, the checks that hold it honest, and the notes
     explaining every decision including the ones that were reversed.
     <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+    <br><br>
+    Not commissioning anything? Still worth an email. If your version of this failed
+    differently &mdash; other geometry, other numbers, a mechanism this piece leaves out &mdash;
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Water%20hammer%20%E2%80%94%20what%20this%20leaves%20out&amp;body=Where%20this%20differs%20from%20what%20I%20see%20in%20the%20field%3A%0A%0A">tell me in one line</a>.
+    Corrections are the main thing that decides what gets built next.
   </p>
 
   <footer>
