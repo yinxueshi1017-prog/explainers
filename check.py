@@ -122,6 +122,23 @@ if m:
 check("python3 check.py" in d, "DEPLOY.md tells you to run this gate")
 check("cd site" not in d, "DEPLOY.md does not tell you to cd into a folder that is not here")
 
+print("\nTHE OFFER  (a price written into thirteen files is a price that will drift)")
+# The price and the turnaround are stated on every page, because most readers
+# arrive on a piece from a shared link and never see the index. Thirteen copies
+# of a number is thirteen chances for one of them to be edited alone.
+prices, times = {}, {}
+for p in pages:
+    prices[p] = set(re.findall(r"£\d[\d,]*\d|£\d", src[p]))
+    times[p]  = set(m.lower() for m in
+                    re.findall(r"(two to three|three to four|four to six) weeks", src[p], re.I))
+allp = set().union(*prices.values())
+allt = set().union(*times.values())
+check(len(allp) == 1, "one price across the whole site (%s)" % (", ".join(sorted(allp)) or "none"))
+check(len(allt) == 1, "one turnaround across the whole site (%s)" % (", ".join(sorted(allt)) or "none"))
+for p in pages:
+    check(len(prices[p]) == 1, "%s: states what it costs" % p)
+    check(len(times[p]) == 1, "%s: states how long it takes" % p)
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
