@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buckling</title>
+<meta name="description" content="Make a strut slender enough and the grade of steel stops mattering entirely. Three grades, three capacities — and past a certain slenderness they are the same number.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M8%202.6%20C4.4%206%2011.6%2010%208%2013.4%22%20fill%3D%22none%22%20stroke%3D%22%23cbd5dd%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M8%201%20L8%202.4%20M8%2013.6%20L8%2015%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. Euler buckling
+  against the squash load, drawn into SVG — no canvas, no WebGL.
+
+  THE ARGUMENT: buckling capacity depends on stiffness and geometry, and
+  stiffness is very nearly the same for every structural steel. So beyond a
+  certain slenderness a higher grade buys nothing at all — the strut fails at
+  the same load whether it is made of the cheapest steel in the yard or the
+  most expensive. The specification looks stronger and the column is not.
+
+  The picture makes it countable: three grades, three dots, and as the strut
+  gets more slender the three dots merge into one.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #bk-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #bk-view:focus { outline:none; }
+  #bk-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  /* Measured: a 1000-unit viewBox at 375px renders at about 0.32. */
+  #bk-view .lbl { font-size:15px; }
+  #bk-view .lbl-sm { font-size:13px; }
+  @media (max-width:34rem) { #bk-view .lbl { font-size:40px; } #bk-view .lbl-sm { font-size:34px; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Buckling — where the grade of steel stops mattering</h1>
+
+  <p class="how" id="bk-how">
+    Drag upward to make the strut longer and more slender; drag down to make it stocky. The
+    arrow keys do the same, a step at a time. <strong>End goes to the most slender</strong>;
+    Home to the stockiest. The three dots are three grades of steel in the same section.
+    Watch what happens to the gap between them. Sound is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="bk-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="stocky"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="bk-how"
+         aria-label="How slender the strut is"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the strut under load. Right: what it can carry, against slenderness.</span>
+      <span id="bk-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="bk-sound" aria-pressed="false">Sound</button>
+    <button id="bk-reset">Reset</button>
+  </div>
+
+  <p class="live" id="bk-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    A short, stocky strut fails by squashing. It carries load until the steel yields, so its
+    capacity is the yield strength times the area — and a stronger grade buys you exactly the
+    extra strength you paid for.
+  </p>
+  <p class="body">
+    A long, slender strut fails a different way. Long before the steel is anywhere near
+    yielding, the column stops being able to stay straight: any small bow grows rather than
+    resisting, and it folds. What decides that load is the <em>stiffness</em> of the steel and
+    the geometry of the section. Not its strength.
+  </p>
+  <p class="body">
+    Every structural steel has essentially the same stiffness. A high-grade steel is not
+    stiffer than a cheap one — it just yields later. So in the slender range the three grades
+    give the same answer, and the extra money bought a number on a certificate.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Past the transition, specifying a higher grade does nothing.</strong> The dots
+    merge. If a column is failing its check and it is slender, a stronger steel is not the
+    fix — a fatter section, a stiffer one, or a shorter unrestrained length is.
+  </p>
+  <p class="body">
+    <strong>Length is punished twice over.</strong> Capacity falls with the square of the
+    slenderness: double the unrestrained length and you have a quarter of the column. That is
+    why a bit of restraint at mid-height is worth more than almost anything you can do to the
+    material.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The model is the Euler critical stress
+      against a squash limit, and the built-in checks confirm it reproduces the closed forms
+      exactly — but that check is the author's own, not a structural engineer's.</li>
+    <li><strong>This is the perfect-column idealisation.</strong> Real columns have initial
+      bow, residual stresses from rolling or welding, and load that is never perfectly
+      concentric. Design codes therefore use buckling curves that sit well below the Euler
+      line near the transition, so the real capacity around the knee is lower than drawn.</li>
+    <li><strong>The transition is drawn as a corner.</strong> In reality the two modes blend
+      over a broad band of slenderness, and the worst place to be is inside that band, which
+      is exactly where this drawing is least accurate.</li>
+    <li><strong>One end condition, one axis, one section.</strong> Effective length depends on
+      how the ends are held and real sections buckle about their weak axis, or in torsion,
+      before the strong axis is troubled.</li>
+    <li><strong>Stiffness is taken as identical across grades.</strong> It is very nearly so
+      for structural steels, which is the point being made — but it is not exactly so, and it
+      is not true at all if you change material family.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE STRUT
+     ================================================================== */
+
+  var E = 210000;                       /* MPa — and very nearly the same
+                                           for every structural steel,
+                                           which is the whole argument    */
+  var GRADES = [
+    { name: 'the cheap one',   fy: 275 },
+    { name: 'the usual one',   fy: 355 },
+    { name: 'the dear one',    fy: 460 }
+  ];
+  var LAM_MIN = 25, LAM_MAX = 200;      /* slenderness, KL/r              */
+
+  function eulerStress(lam) { return Math.PI * Math.PI * E / (lam * lam); }
+  function capacity(lam, fy) { return Math.min(fy, eulerStress(lam)); }
+  /* Where the Euler curve crosses the squash line — the slenderness past
+     which the grade stops appearing in the answer at all. */
+  function lamTrans(fy) { return Math.PI * Math.sqrt(E / fy); }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('bk-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var SX = 150, SY_TOP = 60, SY_BOT = 372;      /* the strut lives here   */
+  var GX0 = 400, GX1 = 950, GY0 = 62, GY1 = 344;
+  var P_HI = 520;                               /* MPa on the plot        */
+
+  function gx(lam) { return GX0 + (GX1 - GX0) * (lam - LAM_MIN) / (LAM_MAX - LAM_MIN); }
+  function gy(s) { return GY1 - (GY1 - GY0) * Math.min(s, P_HI) / P_HI; }
+
+  /* ONE SATURATED COLOUR, and it is the Euler curve: the thing that takes
+     the decision away from the material. The grades are three values of the
+     same cool steel, so when they converge the eye reads one object rather
+     than three colours agreeing. */
+  var STEEL = 'rgb(126,146,166)';
+  var EULER = 'rgb(226,78,38)';
+  var GCOL = ['rgb(96,116,136)', 'rgb(140,162,184)', 'rgb(196,214,230)'];
+
+  /* -- the strut ----------------------------------------------------- */
+  var strut = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 11,
+                           'stroke-linecap': 'round' });
+  var loadTop = el('path', { d: '', stroke: EULER, 'stroke-width': 3,
+                             'stroke-linecap': 'round', fill: 'none' });
+  var baseLine = el('line', { x1: SX - 52, x2: SX + 52, stroke: 'currentColor',
+                              'stroke-width': 2, opacity: '.5' });
+  el('text', { x: SX, y: 34, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.6' }).textContent = 'the load';
+  var slendLbl = el('text', { x: SX, 'class': 'lbl-sm', 'text-anchor': 'middle',
+                              fill: 'currentColor', opacity: '.6' });
+  slendLbl.textContent = 'the strut';
+
+  /* -- the plot ------------------------------------------------------ */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('text', { x: GX1, y: GY1 - 10, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'more slender →';
+  el('text', { x: GX0 - 8, y: GY0 + 4, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'carries more';
+
+  var yieldLines = [], dots = [];
+  for (var i = 0; i < GRADES.length; i++) {
+    yieldLines.push(el('line', { x1: GX0, x2: GX1, stroke: GCOL[i], 'stroke-width': 1.4,
+                                 'stroke-dasharray': '3 5', opacity: '.55' }));
+    dots.push(el('circle', { r: 6, fill: GCOL[i] }));
+  }
+  var euler = el('path', { d: '', fill: 'none', stroke: EULER, 'stroke-width': 2.6,
+                           'stroke-linejoin': 'round' });
+  var eulerLbl = el('text', { x: GX1, y: GY0 + 18, 'class': 'lbl-sm', 'text-anchor': 'end',
+                              fill: EULER, opacity: '.9' });
+  eulerLbl.textContent = 'what slenderness allows';
+  var nowLine = el('line', { y1: GY0, y2: GY1, stroke: 'currentColor',
+                             'stroke-width': 1, opacity: '.35' });
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var lam = LAM_MIN, t = 0;
+
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    stocky: 'Stocky. This strut will be squashed, not buckled: it carries load right up to ' +
+            'the point the steel yields. The three dots are well apart, because here the ' +
+            'grade is exactly what you are buying, and the dearest steel carries the most.',
+    near:   'Close to the transition. The dearest grade has already stopped paying its way — ' +
+            'its dot has come down to meet the curve, because slenderness is now deciding ' +
+            'its capacity rather than its strength. The cheaper grades are still squashing.',
+    slender:'Slender. All three dots are on the curve and there is no gap left between them. ' +
+            'Every grade fails at the same load, because none of them is stiffer than the ' +
+            'others — and stiffness is what is being asked for now. The certificate says ' +
+            'something the column cannot do.',
+    verySlender: 'Very slender. The capacity has collapsed — not because the steel got ' +
+            'worse, but because length is punished twice over. Doubling the unrestrained ' +
+            'length leaves a quarter of the column, whatever it is made of.'
+  };
+
+  var live = document.getElementById('bk-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     The strut is sounded as what it is: a thing whose note falls as it gets
+     more slender. A stocky strut rings high and dead; a slender one droops.
+     It carries the same information as the picture, in the ear.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, osc = null, gain = null;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 2), sr);
+      var d = b.getChannelData(0), i;
+      for (i = 0; i < d.length; i++) d[i] = Math.sin(2 * Math.PI * 110 * i / sr);
+      osc = audio.createBufferSource(); osc.buffer = b; osc.loop = true;
+      gain = audio.createGain(); gain.gain.value = 0;
+      osc.connect(gain); gain.connect(audio.destination); osc.start();
+    } catch (e) { audio = null; }
+  }
+  function setTone() {
+    if (!audio || !gain || !osc) return;
+    /* the note follows the capacity, so it falls as the column does */
+    var f = 0.5 + 1.6 * (capacity(lam, 355) / 460);
+    try { osc.playbackRate.setTargetAtTime(f, audio.currentTime, 0.12); } catch (e) {}
+    gain.gain.setTargetAtTime(soundOn ? 0.07 : 0, audio.currentTime, 0.15);
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var i;
+    /* the strut: longer and more bowed as slenderness rises. The bow is a
+       drawing device, not a computed deflection — Euler theory gives the
+       load at which a bow grows, not how big it gets, and pretending
+       otherwise would be inventing a number the model does not have. */
+    var f = (lam - LAM_MIN) / (LAM_MAX - LAM_MIN);
+    var top = SY_TOP + (1 - f) * 150;
+    var bow = 6 + 54 * f * (0.65 + 0.35 * Math.sin(t * 1.6));
+    strut.setAttribute('d',
+      'M' + SX + ' ' + SY_BOT + ' Q' + (SX + bow).toFixed(1) + ' ' +
+      ((SY_BOT + top) / 2).toFixed(1) + ' ' + SX + ' ' + top.toFixed(1));
+    strut.setAttribute('stroke-width', (11 - 3 * f).toFixed(1));
+    loadTop.setAttribute('d', 'M' + SX + ' ' + (top - 30) + ' L' + SX + ' ' + (top - 6));
+    baseLine.setAttribute('y1', SY_BOT); baseLine.setAttribute('y2', SY_BOT);
+    slendLbl.setAttribute('y', SY_BOT + 28);
+
+    /* the Euler curve */
+    var d = '', started = false;
+    for (i = 0; i <= 200; i++) {
+      var L = LAM_MIN + (LAM_MAX - LAM_MIN) * i / 200;
+      var s = eulerStress(L);
+      if (s > P_HI) continue;
+      d += (started ? ' L' : 'M') + gx(L).toFixed(1) + ' ' + gy(s).toFixed(1);
+      started = true;
+    }
+    euler.setAttribute('d', d);
+
+    /* the grades, and where each one actually is */
+    for (i = 0; i < GRADES.length; i++) {
+      var fy = GRADES[i].fy;
+      yieldLines[i].setAttribute('y1', gy(fy));
+      yieldLines[i].setAttribute('y2', gy(fy));
+      dots[i].setAttribute('cx', gx(lam));
+      dots[i].setAttribute('cy', gy(capacity(lam, fy)));
+    }
+    nowLine.setAttribute('x1', gx(lam)); nowLine.setAttribute('x2', gx(lam));
+
+    /* how far apart the three answers are, as a fraction */
+    var lo = capacity(lam, GRADES[0].fy), hi = capacity(lam, GRADES[2].fy);
+    var spread = hi / lo;
+    document.getElementById('bk-cmp').textContent =
+      spread < 1.005 ? 'All three grades give the same answer.' : '';
+
+    view.setAttribute('aria-valuenow',
+      Math.round((lam - LAM_MIN) / (LAM_MAX - LAM_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      spread < 1.005 ? 'slender enough that every grade is the same' :
+      lam < 60 ? 'stocky' : 'near the transition');
+
+    say(spread < 1.005 ? (lam > 150 ? 'verySlender' : 'slender')
+        : lam < lamTrans(460) * 0.85 ? 'stocky' : 'near');
+    setTone();
+  }
+
+  /* ==================================================================
+     7. THE LOOP — only the bow breathes, so reduced motion can drop it
+     ================================================================== */
+
+  var last = 0;
+  function frame(now) {
+    if (!last) last = now;
+    t += (now - last) / 1000; last = now;
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION
+
+     The only thing that moves here is the strut's bow, which is decoration
+     rather than argument: every claim the piece makes is in the dots and the
+     curve, and those change only when the reader moves the control. So the
+     reduced branch simply renders on input and never animates. The payoff —
+     three dots becoming one — is untouched.
+     ================================================================== */
+
+  function reducedUpdate() { t = 0; render(); }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setLam(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    lam = LAM_MIN + (LAM_MAX - LAM_MIN) * v;
+    if (reduce) reducedUpdate();
+  }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = (lam - LAM_MIN) / (LAM_MAX - LAM_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setLam(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = (lam - LAM_MIN) / (LAM_MAX - LAM_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setLam(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setLam(v - 0.05);
+    else if (k === 'PageUp') setLam(v + 0.2);
+    else if (k === 'PageDown') setLam(v - 0.2);
+    else if (k === 'End') setLam(1);
+    else if (k === 'Home') setLam(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('bk-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    setTone();
+  });
+  document.getElementById('bk-reset').addEventListener('click', function () {
+    setLam(0); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. The Euler stress itself. */
+    chk('Euler stress at a slenderness of one hundred',
+        eulerStress(100), Math.PI * Math.PI * E / 10000, 1e-9, ' MPa');
+
+    /* 2. THE SQUARE. Doubling slenderness leaves a quarter. */
+    chk('double the slenderness, a quarter of the stress',
+        eulerStress(60) / eulerStress(120), 4, 1e-9);
+
+    /* 3. The transition is where the two lines actually cross. */
+    var lt = lamTrans(355);
+    chk('Euler equals yield at the transition', eulerStress(lt), 355, 1e-9, ' MPa');
+
+    /* 4. THE CLAIM THE PIECE MAKES: past the transition the answer does not
+          contain the grade. Checked at a slenderness beyond all three. */
+    var lamS = 140;
+    chk('slender: cheapest and dearest agree',
+        capacity(lamS, 460) / capacity(lamS, 275), 1, 1e-12);
+
+    /* 5. And below it, the grade is exactly what you get. */
+    var lamK = 40;
+    chk('stocky: the grade is the whole difference',
+        capacity(lamK, 460) / capacity(lamK, 275), 460 / 275, 1e-12);
+
+    /* 6. NEGATIVE CONTROL. Make stiffness scale with grade — the thing that
+          is NOT true of structural steel — and check 4 must stop passing. */
+    var realEuler = eulerStress;
+    eulerStress = function (l) { return Math.PI * Math.PI * (E * 460 / 275) / (l * l); };
+    var caught = Math.abs(Math.min(460, eulerStress(lamS)) /
+                          Math.min(275, realEuler(lamS)) - 1) > 1e-6;
+    eulerStress = realEuler;
+    if (caught) out.push('PASS  negative control: stiffness tied to grade fails the agreement check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (transition slenderness: cheapest ' + lamTrans(275).toFixed(1) +
+             ', dearest ' + lamTrans(460).toFixed(1) + ')');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  setLam(0); render();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('buckling: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (!reduce) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
