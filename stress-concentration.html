@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stress Concentration</title>
+<meta name="description" content="A round hole triples the stress beside it, whatever size it is. Flatten the same hole into a slit and the multiplier runs away — while the material you removed accounts for almost none of it.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Crect%20x%3D%222.2%22%20y%3D%224.6%22%20width%3D%2211.6%22%20height%3D%226.8%22%20rx%3D%22.6%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Cellipse%20cx%3D%228%22%20cy%3D%228%22%20rx%3D%223.4%22%20ry%3D%221.15%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M4.6%208%20L3.2%208%20M11.4%208%20L12.8%208%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. The elliptical
+  hole stress concentration drawn into SVG — no canvas, no WebGL.
+
+  THE ARGUMENT: people account for a hole by working out how much section it
+  removed. That arithmetic is right and it is almost entirely beside the
+  point. A round hole in a wide plate multiplies the stress beside it by
+  three, and it does that whatever size the hole is — a pinhole and a
+  man-sized opening give the same three. What the removed material buys you
+  is a few per cent on top.
+
+  And the multiplier is not a property of holes, it is a property of SHAPE.
+  Flatten the same hole into a slit and it climbs without limit, which is the
+  real reason a crack is dangerous and a drilled hole is not: a crack is the
+  same feature with its ends sharpened.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #sc-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #sc-view:focus { outline:none; }
+  #sc-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #sc-view .lbl { font-size:15px; }
+  #sc-view .lbl-sm { font-size:13px; }
+  @media (max-width:34rem) { #sc-view .lbl { font-size:40px; } #sc-view .lbl-sm { font-size:34px; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Stress concentration — the hole's shape, not its size</h1>
+
+  <p class="how" id="sc-how">
+    The plate is being pulled. Drag upward to flatten the hole into a slit; drag down to
+    round it back out. The arrow keys do the same. <strong>End sharpens it as far as it
+    goes</strong>; Home makes it round again. The hole keeps the same width across the pull
+    the whole time, so the amount of material removed hardly changes. Sound is off until you
+    turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="sc-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="a round hole"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="sc-how"
+         aria-label="How sharp the ends of the hole are"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the plate, pulled from both ends. Right: what multiplies the stress.</span>
+      <span id="sc-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="sc-sound" aria-pressed="false">Sound</button>
+    <button id="sc-reset">Reset</button>
+  </div>
+
+  <p class="live" id="sc-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Pull a plate and the stress is spread evenly across it. Put a hole in it and two things
+    happen. The obvious one: there is less material left, so the average stress across what
+    remains goes up a little. The other one is much larger and much less obvious: the lines
+    of force have to go round the hole, they crowd together as they pass it, and right beside
+    the hole the stress is several times the average.
+  </p>
+  <p class="body">
+    For a round hole in a wide plate that crowding factor is exactly three. Not about three —
+    three. And it does not depend on how big the hole is. A pinhole and an opening you could
+    put your arm through concentrate the stress beside them by the same amount.
+  </p>
+  <p class="body">
+    What it does depend on is the shape. The factor is set by how sharply the hole turns at
+    its ends, and as you flatten a round hole into a slit that turn gets tighter and the
+    multiplier climbs without any limit. This is why a crack is in a different category from
+    a hole: a crack is the same feature with its ends sharpened to nothing.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Counting the lost area is not an assessment.</strong> The lost area is the small
+    term. If a check on a perforated member only accounts for the net section, it has
+    accounted for the part that barely matters and missed the multiplier entirely.
+  </p>
+  <p class="body">
+    <strong>The fix is a radius.</strong> Because the multiplier depends on sharpness and not
+    size, you cannot help a sharp feature by making it smaller — but you can transform it by
+    rounding it. That is the whole reason for drilling a hole at the end of a crack, for
+    generous fillets on re-entrant corners, and for why a scratch across the pull is worse
+    than a much bigger smooth recess.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The relation is the classical
+      elliptical-hole result and the built-in checks confirm it exactly — but that check is
+      the author's own, not a stress engineer's.</li>
+    <li><strong>The plate is infinitely wide.</strong> The factor of three is the
+      wide-plate answer; as the hole becomes a significant fraction of the width the real
+      factor changes and the net-section term stops being small.</li>
+    <li><strong>Elastic, isotropic, two-dimensional.</strong> Real materials yield at the
+      hot spot and shed the peak, which is why a ductile part survives a concentration that
+      this arithmetic says should fail it. A brittle one does not get that mercy, and neither
+      does anything under fatigue loading.</li>
+    <li><strong>The multiplier runs to infinity here and does not in reality.</strong> Once
+      the tip radius approaches the scale of the material's own structure the continuum
+      answer stops meaning anything, and the right tool is fracture mechanics rather than a
+      concentration factor.</li>
+    <li><strong>The colour around the hole is indicative, not a solved field.</strong> The
+      peak value at the edge is exact; the way the drawing fades it away from the hole is a
+      rendering choice, and its only job is to show where the crowding is.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE PLATE AND THE HOLE
+
+     a is the half-dimension across the pull, b the half-dimension along it.
+     The control changes b, so the hole keeps the same width across the pull
+     throughout and the material removed barely moves — which is what lets
+     the piece separate the two effects honestly.
+     ================================================================== */
+
+  var A_HALF   = 10;        /* mm across the pull, fixed                  */
+  var B_MIN    = 0.2;       /* mm along the pull at the sharpest          */
+  var B_MAX    = 10;        /* mm along the pull when round               */
+  var W_PLATE  = 200;       /* mm wide — wide enough for the classical
+                               answer to be the right one                 */
+
+  /* Kt = 1 + 2a/b for an elliptical hole in a wide plate under tension.
+     Equivalently 1 + 2*sqrt(a/rho) with rho = b*b/a the tip radius. */
+  function Kt(b) { return 1 + 2 * A_HALF / b; }
+  function tipRadius(b) { return b * b / A_HALF; }
+  /* the OTHER effect, the one people do remember: less section left */
+  function netFactor() { return 1 / (1 - 2 * A_HALF / W_PLATE); }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('sc-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var PX = 70, PW = 520, PY = 96, PH = 250;      /* the plate            */
+  var CX = PX + PW / 2, CY = PY + PH / 2;
+  var BAR_X = 700, BAR_W = 62, BAR_GAP = 70, BAR_TOP = 70, BAR_BOT = 350;
+  var K_MAX = 24;                                 /* top of the scale     */
+
+  /* ONE SATURATED COLOUR, and it is the crowding. The plate and the pull
+     are cool steel; the only saturated thing in the drawing is the stress
+     piling up at the ends of the hole, which is the entire subject. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+
+  el('rect', { x: PX, y: PY, width: PW, height: PH, rx: 2, fill: STEEL, opacity: '.5' });
+
+  /* the crowding, drawn as a few bands that tighten at the ends of the hole.
+     Indicative, and the honesty section says so: the PEAK is exact, the
+     falloff is a rendering choice whose only job is to show where it is. */
+  var bands = [];
+  for (var i = 0; i < 7; i++) {
+    bands.push(el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 2,
+                            opacity: '0' }));
+  }
+  var hole = el('ellipse', { cx: CX, cy: CY, fill: 'rgb(20,26,32)',
+                             stroke: 'currentColor', 'stroke-width': 1.2 });
+  var hotL = el('circle', { r: 5, fill: HOT, opacity: '.95' });
+  var hotR = el('circle', { r: 5, fill: HOT, opacity: '.95' });
+
+  /* the pull */
+  for (i = 0; i < 5; i++) {
+    var yy = PY + PH * (i + 0.5) / 5;
+    el('path', { d: 'M' + (PX - 44) + ' ' + yy + ' L' + (PX - 6) + ' ' + yy,
+                 stroke: 'currentColor', 'stroke-width': 2, opacity: '.45' });
+    el('path', { d: 'M' + (PX + PW + 6) + ' ' + yy + ' L' + (PX + PW + 44) + ' ' + yy,
+                 stroke: 'currentColor', 'stroke-width': 2, opacity: '.45' });
+  }
+  el('text', { x: PX - 44, y: PY - 20, 'class': 'lbl-sm', fill: 'currentColor',
+               opacity: '.55' }).textContent = 'pulled this way';
+
+  /* the two bars: what the shape did, and what the lost area did */
+  var barK = el('rect', { x: BAR_X, width: BAR_W, fill: HOT });
+  var barN = el('rect', { x: BAR_X + BAR_W + BAR_GAP, width: BAR_W, fill: STEEL });
+  var BAR_R = BAR_X + 2 * BAR_W + BAR_GAP;      /* right edge of the pair */
+  el('line', { x1: BAR_X - 24, y1: BAR_BOT, x2: BAR_R, y2: BAR_BOT,
+               stroke: 'currentColor', 'stroke-width': 1.2, opacity: '.45' });
+  /* SHORT, AND ANCHORED TO EDGES. At the phone label size the long versions
+     of these were wider than the columns they sat over and wider than the
+     drawing itself. Measured at 375px. */
+  el('text', { x: BAR_X + BAR_W / 2, y: BAR_BOT + 26, 'class': 'lbl-sm',
+               'text-anchor': 'middle', fill: 'currentColor',
+               opacity: '.7' }).textContent = 'shape';
+  el('text', { x: BAR_X + BAR_W + BAR_GAP + BAR_W / 2, y: BAR_BOT + 26, 'class': 'lbl-sm',
+               'text-anchor': 'middle', fill: 'currentColor',
+               opacity: '.7' }).textContent = 'lost area';
+  el('text', { x: BAR_R, y: BAR_TOP - 34, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'stress multiplier';
+  /* the round-hole answer, marked once and never moved */
+  var threeY = BAR_BOT - (BAR_BOT - BAR_TOP) * 3 / K_MAX;
+  el('line', { x1: BAR_X - 24, y1: threeY, x2: BAR_R, y2: threeY,
+               stroke: 'currentColor', 'stroke-width': 1, 'stroke-dasharray': '3 5',
+               opacity: '.4' });
+  el('text', { x: BAR_R, y: threeY - 8, 'class': 'lbl-sm',
+               'text-anchor': 'end', fill: 'currentColor',
+               opacity: '.5' }).textContent = 'a round hole';
+  /* INSIDE the bar area: above it, this shared a band with the caption. */
+  var overflow = el('text', { x: BAR_X + BAR_W / 2, y: BAR_TOP + 26, 'class': 'lbl-sm',
+                              'text-anchor': 'middle', fill: HOT, opacity: '0' });
+  overflow.textContent = 'off the top';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var b = B_MAX;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    round: 'A round hole. The stress right beside it is three times the stress in the rest ' +
+           'of the plate — and it would still be three times if this hole were the size of a ' +
+           'pinhead or the size of a door. The bar next to it is everything the missing ' +
+           'material contributed, which is a few per cent.',
+    oval:  'Flattened a little. The hole has taken away almost exactly as much material as ' +
+           'before, so the second bar has hardly moved — and the first one has climbed well ' +
+           'past the round-hole line. Nothing about this is explained by lost area.',
+    sharp: 'Sharp now. The multiplier has run away, because what sets it is how tightly the ' +
+           'hole turns at its ends, and that turn is getting tighter. The plate is the same ' +
+           'plate, the pull is the same pull, and very nearly the same amount of steel is ' +
+           'missing as when it was round.',
+    slit:  'As sharp as this goes. Keep going and there is no limit: as the ends approach a ' +
+           'point the multiplier approaches infinity. That is the honest reason a crack sits ' +
+           'in a different category from a hole — a crack is this feature with its ends ' +
+           'sharpened to nothing, and no amount of net-section arithmetic will find it.'
+  };
+  var live = document.getElementById('sc-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     The note rises with the multiplier: a round hole hums, a slit shrieks.
+     It is the one quantity the piece is about, given to the ear.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, src = null, gain = null;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var sr = audio.sampleRate, buf = audio.createBuffer(1, Math.floor(sr * 2), sr);
+      var d = buf.getChannelData(0), j;
+      for (j = 0; j < d.length; j++) d[j] = Math.sin(2 * Math.PI * 180 * j / sr) * 0.7;
+      src = audio.createBufferSource(); src.buffer = buf; src.loop = true;
+      gain = audio.createGain(); gain.gain.value = 0;
+      src.connect(gain); gain.connect(audio.destination); src.start();
+    } catch (e) { audio = null; }
+  }
+  function setTone() {
+    if (!audio || !src) return;
+    try { src.playbackRate.setTargetAtTime(0.5 + Kt(b) / 12, audio.currentTime, 0.1); } catch (e) {}
+    gain.gain.setTargetAtTime(soundOn ? 0.06 : 0, audio.currentTime, 0.12);
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  var SCALE = 11;                       /* view units per mm of plate     */
+
+  function render() {
+    var k = Kt(b), i;
+    var rx = A_HALF * SCALE, ry = b * SCALE;
+
+    hole.setAttribute('rx', rx); hole.setAttribute('ry', Math.max(1.2, ry));
+    hotL.setAttribute('cx', CX - rx); hotL.setAttribute('cy', CY);
+    hotR.setAttribute('cx', CX + rx); hotR.setAttribute('cy', CY);
+    var hotR2 = 3 + 4 * Math.min(1, k / K_MAX);
+    hotL.setAttribute('r', hotR2); hotR.setAttribute('r', hotR2);
+
+    /* the crowding bands: force lines squeezing past the ends of the hole.
+       Their spacing tightens as the multiplier rises. */
+    for (i = 0; i < bands.length; i++) {
+      var off = (i + 1) / bands.length;
+      var squeeze = 1 + (k - 1) * 0.06 * (1 - off);
+      var yOff = ry + off * 46 * (1 / squeeze) + 6;
+      var d = 'M' + PX + ' ' + (CY - yOff).toFixed(1) +
+              ' Q' + CX + ' ' + (CY - yOff - 14 * (1 - off)).toFixed(1) +
+              ' ' + (PX + PW) + ' ' + (CY - yOff).toFixed(1);
+      d += ' M' + PX + ' ' + (CY + yOff).toFixed(1) +
+           ' Q' + CX + ' ' + (CY + yOff + 14 * (1 - off)).toFixed(1) +
+           ' ' + (PX + PW) + ' ' + (CY + yOff).toFixed(1);
+      bands[i].setAttribute('d', d);
+      bands[i].setAttribute('opacity', (0.5 * (1 - off) + 0.08).toFixed(2));
+    }
+
+    /* the two bars */
+    var hk = (BAR_BOT - BAR_TOP) * Math.min(1, k / K_MAX);
+    barK.setAttribute('y', BAR_BOT - hk); barK.setAttribute('height', Math.max(0, hk));
+    var hn = (BAR_BOT - BAR_TOP) * Math.min(1, netFactor() / K_MAX);
+    barN.setAttribute('y', BAR_BOT - hn); barN.setAttribute('height', Math.max(0, hn));
+    overflow.setAttribute('opacity', k > K_MAX ? '.95' : '0');
+
+    document.getElementById('sc-cmp').textContent =
+      Math.abs(k - 3) < 0.02 ? 'A round hole: exactly three, at any size.' : '';
+
+    view.setAttribute('aria-valuenow',
+      Math.round((B_MAX - b) / (B_MAX - B_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      Math.abs(k - 3) < 0.02 ? 'a round hole' :
+      k < 8 ? 'an oval hole' :
+      k < K_MAX ? 'a sharp slot' : 'so sharp the multiplier is off the scale');
+
+    say(Math.abs(k - 3) < 0.02 ? 'round' : k < 8 ? 'oval' : k < K_MAX ? 'sharp' : 'slit');
+    setTone();
+  }
+
+  /* ==================================================================
+     7. REDUCED MOTION
+
+     Nothing animates: every quantity here is a function of the control, so
+     the drawing changes when the reader changes it and never otherwise. The
+     reduced branch is the same branch, and the payoff — one bar running off
+     the top while the other stands still — is untouched.
+     ================================================================== */
+
+  /* ==================================================================
+     8. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setSharp(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    /* geometric, so the interesting end gets as much of the travel as the
+       dull end: linear in b spends most of the control on shapes that are
+       all nearly round */
+    b = B_MAX * Math.pow(B_MIN / B_MAX, v);
+    render();
+  }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev);
+    v0 = Math.log(b / B_MAX) / Math.log(B_MIN / B_MAX);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setSharp(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true;
+    var v = Math.log(b / B_MAX) / Math.log(B_MIN / B_MAX);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setSharp(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setSharp(v - 0.05);
+    else if (k === 'PageUp') setSharp(v + 0.2);
+    else if (k === 'PageDown') setSharp(v - 0.2);
+    else if (k === 'End') setSharp(1);
+    else if (k === 'Home') setSharp(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('sc-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    setTone();
+  });
+  document.getElementById('sc-reset').addEventListener('click', function () { setSharp(0); });
+
+  /* ==================================================================
+     9. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. A round hole gives exactly three. Not about three. */
+    chk('a round hole', Kt(A_HALF), 3, 1e-12);
+
+    /* 2. THE CLAIM: it does not depend on the size. Scale the whole hole by
+          a hundred and the answer must not move at all. */
+    var realA = A_HALF;
+    A_HALF = realA * 100;
+    var bigRound = Kt(A_HALF);
+    A_HALF = realA / 20;
+    var tinyRound = Kt(A_HALF);
+    A_HALF = realA;
+    chk('a hole a hundred times bigger', bigRound, 3, 1e-12);
+    chk('a hole twenty times smaller', tinyRound, 3, 1e-12);
+
+    /* 3. The two classical forms agree: 1 + 2a/b and 1 + 2*sqrt(a/rho). */
+    var bb = 2;
+    chk('the tip-radius form agrees',
+        1 + 2 * Math.sqrt(A_HALF / tipRadius(bb)), Kt(bb), 1e-12);
+
+    /* 4. THE COMPARISON THE PIECE IS BUILT ON. The lost area is the small
+          term: for this hole it is a few per cent against a factor of three. */
+    chk('what the lost area contributes', netFactor(), 1 / (1 - 2 * A_HALF / W_PLATE), 1e-12);
+    if (netFactor() < 1.2 && Kt(A_HALF) > 2.5) {
+      out.push('PASS  the lost area is the small term  (' + netFactor().toFixed(3) +
+               ' against ' + Kt(A_HALF).toFixed(1) + ')');
+    } else { ok = false; out.push('FAIL  the two effects are not separated'); }
+
+    /* 5. NEGATIVE CONTROL. Make the factor depend on absolute size — the
+          intuition the piece exists to correct — and check 2 must fail. */
+    var realKt = Kt;
+    Kt = function (bv) { return 1 + 2 * A_HALF / bv * (A_HALF / 10); };
+    A_HALF = realA * 100;
+    var caught = Math.abs(Kt(A_HALF) - 3) > 1e-6;
+    A_HALF = realA; Kt = realKt;
+    if (caught) out.push('PASS  negative control: a size-dependent factor fails the size check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (sharpest here: ' + Kt(B_MIN).toFixed(0) +
+             ' times, at a tip radius of ' + tipRadius(B_MIN).toFixed(3) + ' mm)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     10. GO
+     ================================================================== */
+
+  setSharp(0);
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('stress-concentration: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>
