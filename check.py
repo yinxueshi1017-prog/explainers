@@ -56,16 +56,17 @@ for p in pages:
     check(meta("twitter:card") == "summary_large_image", "%s: twitter card is the large one" % p)
     # The name on the card, the name in the unfurl and the name in the tab were
     # three different strings for one piece ("Fatigue Crack Growth" / "Fatigue
-    # cracks" / "Fatigue crack growth"). They may differ in case; they may not
-    # differ in substance. The index is the one documented exception: its tab
-    # carries the author, its card names the thing.
+    # cracks" / "Fatigue crack growth"). They are now one string, character for
+    # character — the tab was moved to the card's sentence case. The index is the
+    # one documented exception: its tab carries the author, its card names the
+    # thing.
     title = re.search(r"<title>(.*?)</title>", s, re.S).group(1).strip()
     if p == "index.html":
         check(meta("og:title") == "Interactive explainers for engineering failure modes",
               "%s: homepage card names the site, not the author" % p)
     else:
-        check(meta("og:title").lower() == title.lower(),
-              "%s: shared name matches the page's own name" % p)
+        check(meta("og:title") == title,
+              "%s: shared name is the page's own name, exactly" % p)
     check(meta("twitter:title") == meta("og:title"), "%s: twitter title matches og" % p)
     # The alt describes the IMAGE, not the og:title — on the homepage the card
     # is drawn with the short name while the unfurl title is the long one.
