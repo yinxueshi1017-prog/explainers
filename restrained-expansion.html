@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restrained Expansion</title>
+<meta name="description" content="Hold steel and heat it, and the stress does not depend on how long it is. A six metre bar and a six hundred metre one reach the same number — until you allow some movement, and then length is everything.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Crect%20x%3D%221%22%20y%3D%223.4%22%20width%3D%221.9%22%20height%3D%229.2%22%20rx%3D%22.4%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Crect%20x%3D%2213.1%22%20y%3D%223.4%22%20width%3D%221.9%22%20height%3D%229.2%22%20rx%3D%22.4%22%20fill%3D%22%23cbd5dd%22%2F%3E%3Crect%20x%3D%223.4%22%20y%3D%226.6%22%20width%3D%229.2%22%20height%3D%222.8%22%20rx%3D%22.4%22%20fill%3D%22%23e0703a%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. Restrained
+  thermal expansion drawn into SVG — no canvas, no WebGL.
+
+  THE ARGUMENT, in two halves that contradict what people expect in both
+  directions. Hold a steel member at both ends and heat it, and the stress it
+  develops is E times alpha times the temperature rise. Length does not appear
+  in that expression at all: a six metre bar and a six hundred metre pipeline
+  reach exactly the same stress for the same temperature rise. People expect
+  the long one to be worse and it is not.
+
+  And then: allow a few millimetres of movement, and length becomes the only
+  thing that matters. The same gap that completely relieves the short member
+  is nothing to the long one, because what relieves stress is not the gap but
+  the gap divided by the length. People expect an expansion joint to be an
+  expansion joint, and it is not.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #re-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #re-view:focus { outline:none; }
+  #re-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #re-view .lbl { font-size:15px; }
+  #re-view .lbl-sm { font-size:13px; }
+  @media (max-width:34rem) { #re-view .lbl { font-size:40px; } #re-view .lbl-sm { font-size:34px; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Restrained expansion — the length that does not matter, until it does</h1>
+
+  <p class="how" id="re-how">
+    Both members are the same steel, held at both ends, and both have warmed by the same
+    amount. One is short, one is long. Drag upward to allow them a little movement at one
+    end; drag down to hold them rigidly. The arrow keys do the same.
+    <strong>Home holds them solid</strong>; End gives them all the movement on offer. Sound
+    is off until you turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="re-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="held solid at both ends"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="re-how"
+         aria-label="How much movement the ends are allowed"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Two members, the same steel, the same temperature rise. The bars on the right are the stress in each.</span>
+      <span id="re-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="re-sound" aria-pressed="false">Sound</button>
+    <button id="re-reset">Reset</button>
+  </div>
+
+  <p class="live" id="re-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Steel wants to get longer when it is heated, by a fixed fraction of its length per degree.
+    Hold both ends and it cannot, so it is squeezed back to the length it started at — and the
+    stress that takes is the stiffness times the strain you prevented.
+  </p>
+  <p class="body">
+    The strain you prevented is a <em>fraction</em>. It is the same fraction whatever the
+    length is. So the stress is the stiffness times the expansion coefficient times the
+    temperature rise, and the length of the member is simply not in that expression. A short
+    bar and a long pipeline, held rigidly and warmed by the same amount, are carrying exactly
+    the same stress.
+  </p>
+  <p class="body">
+    Now allow the end to move a few millimetres. What that buys is not a length of movement,
+    it is a <em>fraction</em> of movement: the gap divided by the member. On a short member a
+    few millimetres is a large fraction and the stress falls away. On a long one the same few
+    millimetres is almost nothing, and the stress barely notices.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Held rigidly, length is irrelevant.</strong> There is no such thing as a member
+    that is "too long to restrain" — the short one is in just as much trouble. What decides
+    whether it survives is the temperature rise and the steel, not the span.
+  </p>
+  <p class="body">
+    <strong>Once you allow movement, length is the only thing that matters.</strong> An
+    expansion allowance is not a quantity of millimetres, it is a quantity of millimetres per
+    metre. The same detail that works on a short run does nothing on a long one, which is why
+    the answer on long runs is more joints rather than bigger ones.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The relations are the elementary ones
+      and the built-in checks confirm them exactly — but that check is the author's own, not a
+      structural or pipeline engineer's.</li>
+    <li><strong>The restraints are perfectly rigid.</strong> Real abutments, anchors and
+      supports deflect, and that flexibility relieves stress in exactly the way the gap does —
+      so a real member is usually better off than this one, by an amount nobody knows
+      precisely.</li>
+    <li><strong>Friction is ignored.</strong> A buried pipeline or a rail is restrained by
+      friction along its length rather than at its ends, which makes the stress build up over
+      a transition length and then plateau. The plateau value is the one drawn here; the ends
+      behave differently.</li>
+    <li><strong>Nothing here buckles.</strong> A long member in compression will usually go
+      sideways long before it reaches the stress shown — which is precisely how continuously
+      welded rail fails on hot days. That makes the real case worse than the one drawn.</li>
+    <li><strong>Elastic only, and one direction.</strong> Past yield the member relieves
+      itself by deforming permanently, and then goes into tension when it cools back down.
+      That cycle is the interesting part of the real problem and is out of scope here.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE TWO MEMBERS
+     ================================================================== */
+
+  var E     = 210000;      /* MPa                                        */
+  var ALPHA = 12e-6;       /* per kelvin, structural steel               */
+  var FY    = 275;         /* MPa                                        */
+  var DT    = 60;          /* K of temperature rise, the same for both   */
+  var L_SHORT = 6;         /* m                                          */
+  var L_LONG  = 120;       /* m                                          */
+  var GAP_MAX = 6;         /* mm of movement the control can allow       */
+
+  /* THE WHOLE MODEL. The prevented strain is alpha*dT less whatever the gap
+     gives back — and what the gap gives back is gap OVER LENGTH, which is
+     the only place length enters at all. */
+  function stress(gapMm, L) {
+    var relieved = gapMm / (L * 1000);
+    var s = E * (ALPHA * DT - relieved);
+    return s > 0 ? s : 0;
+  }
+  /* the gap that would relieve a member completely */
+  function gapToFree(L) { return ALPHA * DT * L * 1000; }
+  /* the temperature rise that yields a rigidly held member */
+  function dtYield() { return FY / (E * ALPHA); }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('re-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var AX0 = 60, AX1 = 620;          /* where the members are drawn        */
+  var ROW = [132, 268];             /* the two members' centre lines      */
+  var BAR_X = 720, BAR_W = 58, BAR_TOP = 70, BAR_BOT = 340;
+  /* THE SCALE HAS TO CONTAIN THE YIELD LINE. At 200 the yield line clamped
+     to the very top of the plot, which drew it as though the rigid case were
+     right at the limit and collided its label with the axis caption. The
+     scale now sits above yield so the gap between "what this reaches" and
+     "what it takes to yield" is a real distance on the drawing. */
+  var S_MAX = 300;                  /* MPa at the top of the stress bars  */
+
+  /* ONE SATURATED COLOUR, and it is the stress. The steel, the abutments
+     and the gap are all the same cool grey, so the only thing that changes
+     colour in the drawing is the thing being argued about. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+
+  function stressColour(s) {
+    var t = Math.min(1, s / S_MAX);
+    return 'rgb(' + Math.round(126 + (226 - 126) * t) + ',' +
+                    Math.round(146 + (78 - 146) * t) + ',' +
+                    Math.round(166 + (38 - 166) * t) + ')';
+  }
+
+  var members = [], gaps = [], nameLbls = [], bars = [], barLbls = [];
+  for (var r = 0; r < 2; r++) {
+    /* abutments: immovable, and drawn as such */
+    el('rect', { x: AX0 - 26, y: ROW[r] - 44, width: 22, height: 88, rx: 2,
+                 fill: 'rgb(70,82,94)' });
+    el('rect', { x: AX1 + 4, y: ROW[r] - 44, width: 22, height: 88, rx: 2,
+                 fill: 'rgb(70,82,94)' });
+    members.push(el('rect', { x: AX0, y: ROW[r] - 17, height: 34, rx: 2, fill: STEEL }));
+    gaps.push(el('rect', { y: ROW[r] - 17, height: 34, fill: 'rgb(30,38,46)' }));
+    nameLbls.push(el('text', { x: AX0, y: ROW[r] - 30, 'class': 'lbl-sm',
+                               fill: 'currentColor', opacity: '.65' }));
+    bars.push(el('rect', { x: BAR_X + r * (BAR_W + 34), width: BAR_W, fill: STEEL }));
+    barLbls.push(el('text', { x: BAR_X + r * (BAR_W + 34) + BAR_W / 2, y: BAR_BOT + 26,
+                              'class': 'lbl-sm', 'text-anchor': 'middle',
+                              fill: 'currentColor', opacity: '.65' }));
+  }
+  nameLbls[0].textContent = 'the short one';
+  nameLbls[1].textContent = 'the long one';
+  barLbls[0].textContent = 'short';
+  barLbls[1].textContent = 'long';
+
+  /* the stress scale, with the one line that matters marked */
+  el('line', { x1: BAR_X - 22, y1: BAR_BOT, x2: BAR_X + 2 * BAR_W + 56, y2: BAR_BOT,
+               stroke: 'currentColor', 'stroke-width': 1.2, opacity: '.45' });
+  var yieldY = BAR_BOT - (BAR_BOT - BAR_TOP) * Math.min(1, FY / S_MAX);
+  el('line', { x1: BAR_X - 22, y1: yieldY, x2: BAR_X + 2 * BAR_W + 56, y2: yieldY,
+               stroke: HOT, 'stroke-width': 1.2, 'stroke-dasharray': '3 5', opacity: '.65' });
+  el('text', { x: BAR_X + 2 * BAR_W + 56, y: yieldY - 8, 'class': 'lbl-sm',
+               'text-anchor': 'end', fill: HOT, opacity: '.85' }).textContent = 'yields above here';
+  /* Clear of the yield label below it. At the phone size a fourteen-unit gap
+     is less than half a line of text, and the two touched. */
+  el('text', { x: BAR_X - 22, y: BAR_TOP - 34, 'class': 'lbl-sm',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'stress in the steel';
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var gap = 0;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    rigid: 'Held solid at both ends. The two bars are the same height, and they will stay ' +
+           'the same height however different the members are: the stress is the stiffness ' +
+           'times the expansion the steel was not allowed to make, and that is a fraction, ' +
+           'not a length. The long one is in no more trouble than the short one.',
+    some:  'A little movement allowed. The short member has already shed a good part of its ' +
+           'stress, because a few millimetres is a real fraction of a short member. The long ' +
+           'one has barely noticed — the same gap is almost nothing spread over that much ' +
+           'steel.',
+    most:  'More movement still. The gap that has nearly freed the short member has hardly ' +
+           'touched the long one. This is the part people get wrong when they detail a long ' +
+           'run: the allowance that worked before is not a quantity of millimetres, it is ' +
+           'millimetres per metre, and the long run needs the same fraction, not the same gap.',
+    freed: 'The short member is free — it can now expand without pushing on anything, and it ' +
+           'is carrying nothing at all. The long one is still very nearly as stressed as it ' +
+           'was when both ends were solid. Same steel, same warming, same detail.'
+  };
+  var live = document.getElementById('re-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     Two tones, one per member, each pitched by its stress. Held rigidly they
+     are in unison, which is the claim; open the gap and the short one falls
+     away while the long one holds its note. The beat between them IS the
+     argument, and it is audible before it is legible.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, oscs = [], gains = [];
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      for (var i = 0; i < 2; i++) {
+        var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 2), sr);
+        var d = b.getChannelData(0), j;
+        for (j = 0; j < d.length; j++) d[j] = Math.sin(2 * Math.PI * 160 * j / sr) * 0.8;
+        var o = audio.createBufferSource(); o.buffer = b; o.loop = true;
+        var g = audio.createGain(); g.gain.value = 0;
+        o.connect(g); g.connect(audio.destination); o.start();
+        oscs.push(o); gains.push(g);
+      }
+    } catch (e) { audio = null; }
+  }
+  function setTones() {
+    if (!audio || !oscs.length) return;
+    var Ls = [L_SHORT, L_LONG];
+    for (var i = 0; i < 2; i++) {
+      var s = stress(gap, Ls[i]);
+      try {
+        oscs[i].playbackRate.setTargetAtTime(0.55 + 1.15 * (s / S_MAX), audio.currentTime, 0.1);
+      } catch (e) {}
+      gains[i].gain.setTargetAtTime(soundOn ? 0.05 * (s > 0 ? 1 : 0) : 0,
+                                    audio.currentTime, 0.12);
+    }
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var Ls = [L_SHORT, L_LONG], i;
+    for (i = 0; i < 2; i++) {
+      var s = stress(gap, Ls[i]);
+      /* THE GAP IS DRAWN AS A FRACTION, not as millimetres. Drawing it to a
+         common absolute scale would make it invisible on the long member and
+         hide the entire point; drawing it as the fraction of the member it
+         actually represents is what the physics cares about. */
+      var frac = Math.min(1, (gap / (Ls[i] * 1000)) / (ALPHA * DT));
+      var full = AX1 - AX0;
+      var gw = full * 0.16 * frac;              /* 0.16 is the drawn width
+                                                   of a fully-freeing gap  */
+      members[i].setAttribute('width', Math.max(2, full - gw));
+      members[i].setAttribute('fill', stressColour(s));
+      gaps[i].setAttribute('x', AX1 - gw);
+      gaps[i].setAttribute('width', Math.max(0, gw));
+      nameLbls[i].setAttribute('y', ROW[i] - 30);
+
+      var h = (BAR_BOT - BAR_TOP) * Math.min(1, s / S_MAX);
+      bars[i].setAttribute('y', BAR_BOT - h);
+      bars[i].setAttribute('height', Math.max(0, h));
+      bars[i].setAttribute('fill', stressColour(s));
+    }
+
+    var ss = stress(gap, L_SHORT), sl = stress(gap, L_LONG);
+    document.getElementById('re-cmp').textContent =
+      gap === 0 ? 'Both members: the same stress.' : '';
+
+    view.setAttribute('aria-valuenow', Math.round(gap / GAP_MAX * 100));
+    view.setAttribute('aria-valuetext',
+      gap === 0 ? 'held solid at both ends' :
+      ss === 0 ? 'the short one is free, the long one is not' :
+      ss < sl * 0.5 ? 'the short one has shed most of its stress' :
+      'a little movement allowed');
+
+    say(gap === 0 ? 'rigid' : ss === 0 ? 'freed' : ss < sl * 0.5 ? 'most' : 'some');
+    setTones();
+  }
+
+  /* ==================================================================
+     7. REDUCED MOTION
+
+     Nothing in this piece animates: every quantity is a function of the
+     control alone, so the drawing changes when the reader changes it and at
+     no other time. The reduced branch is therefore the same branch, and the
+     payoff — two equal bars becoming very unequal — is untouched.
+     ================================================================== */
+
+  /* ==================================================================
+     8. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setGap(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    gap = GAP_MAX * v;
+    render();
+  }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev); v0 = gap / GAP_MAX;
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setGap(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true, v = gap / GAP_MAX;
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setGap(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setGap(v - 0.05);
+    else if (k === 'PageUp') setGap(v + 0.2);
+    else if (k === 'PageDown') setGap(v - 0.2);
+    else if (k === 'End') setGap(1);
+    else if (k === 'Home') setGap(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('re-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    setTones();
+  });
+  document.getElementById('re-reset').addEventListener('click', function () { setGap(0); });
+
+  /* ==================================================================
+     9. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. The relation itself, with no gap. */
+    chk('rigid restraint gives E times alpha times the rise',
+        stress(0, L_SHORT), E * ALPHA * DT, 1e-9, ' MPa');
+
+    /* 2. THE CLAIM: with no gap, length is not in the answer. A factor of
+          twenty in length must change nothing at all. */
+    chk('rigid: short and long agree', stress(0, L_LONG) / stress(0, L_SHORT), 1, 1e-12);
+
+    /* 3. The temperature that yields a held member. */
+    chk('rigid member yields at this rise', dtYield(), FY / (E * ALPHA), 1e-9, ' K');
+
+    /* 4. WITH A GAP, length is the whole answer. The relief is the gap over
+          the length, so the same gap relieves the short member twenty times
+          as much strain as the long one. */
+    var g = 2;
+    var reliefShort = E * (g / (L_SHORT * 1000)), reliefLong = E * (g / (L_LONG * 1000));
+    chk('the same gap relieves in proportion to length',
+        reliefShort / reliefLong, L_LONG / L_SHORT, 1e-12);
+
+    /* 5. And the gap needed to free a member scales with its length. */
+    chk('the gap that frees it scales with length',
+        gapToFree(L_LONG) / gapToFree(L_SHORT), L_LONG / L_SHORT, 1e-12);
+
+    /* 6. NEGATIVE CONTROL. Put length into the rigid case — the mistake the
+          piece exists to correct — and check 2 must stop passing. */
+    var real = stress;
+    stress = function (gm, L) { return E * ALPHA * DT * (L / L_SHORT); };
+    var caught = Math.abs(stress(0, L_LONG) / stress(0, L_SHORT) - 1) > 1e-6;
+    stress = real;
+    if (caught) out.push('PASS  negative control: length in the rigid case fails the agreement check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (to free them at this rise: short ' + gapToFree(L_SHORT).toFixed(1) +
+             ' mm, long ' + gapToFree(L_LONG).toFixed(0) + ' mm)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     10. GO
+     ================================================================== */
+
+  setGap(0);
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('restrained-expansion: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>
