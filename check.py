@@ -95,6 +95,19 @@ for p in pages:
           "%s: says the physics is unreviewed" % p)
     check("mailto:" in src[p], "%s: offers a way to reply" % p)
 
+print("\nTHE DOCS DESCRIBE THIS REPOSITORY  (they said four files and cd site)")
+d = open("DEPLOY.md", encoding="utf-8").read()
+words = {"twelve":12, "eleven":11, "ten":10, "thirteen":13, "fourteen":14}
+m = re.match(r"# Deploying this site\n\n(\w+) pages, (\w+) preview cards", d)
+check(m is not None, "DEPLOY.md still opens by counting what is here")
+if m:
+    check(words.get(m.group(1).lower()) == len(pages),
+          "DEPLOY.md's page count is the number of pages (%d)" % len(pages))
+    check(words.get(m.group(2).lower()) == len(glob.glob("og/*.png")),
+          "DEPLOY.md's card count is the number of cards (%d)" % len(glob.glob("og/*.png")))
+check("python3 check.py" in d, "DEPLOY.md tells you to run this gate")
+check("cd site" not in d, "DEPLOY.md does not tell you to cd into a folder that is not here")
+
 print("\nSITEMAP")
 root = ET.parse("sitemap.xml").getroot()
 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
