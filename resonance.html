@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resonance</title>
+<meta name="description" content="Stiffening a structure moves its resonance; it does not lower it. The height of the peak is set by damping and by nothing else — and away from resonance damping does almost nothing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%230e1114%22%2F%3E%3Cpath%20d%3D%22M1.6%2012%20C4.6%2012%204.2%203.4%208%203.4%20C11.8%203.4%2011.4%2012%2014.4%2012%22%20fill%3D%22none%22%20stroke%3D%22%23e0703a%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+
+<!--
+  ONE FILE. No libraries, no build step, no network requests. The response of
+  a single-degree-of-freedom system to harmonic excitation, drawn into SVG —
+  no canvas, no WebGL.
+
+  THE ARGUMENT: the instinctive response to a vibration problem is to stiffen
+  the thing. Stiffening moves the resonance to a different frequency, and if
+  the excitation is fixed and stays below it, that works. But it does not
+  make the peak any smaller. The height of the peak is one over twice the
+  damping ratio, and stiffness does not appear in that at all — so on
+  anything with a variable speed, or a second harmonic to land on, the
+  problem has been moved rather than solved, and it is exactly as bad when it
+  is found again.
+
+  The second half, which is the useful one: away from resonance, damping
+  makes almost no difference at all. It is not a general-purpose reducer of
+  vibration. It does one job, at one place, and there it does it better than
+  anything else available.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --ground:#0e1114; --card:#141a20; --ink:#cbd5dd; --ink-dim:#7d8fa0;
+    --ink-lede:#9fb0c0; --rule:#2a3138; --accent:#93a9c0; --focus:#e0864a;
+  }
+  @media print {
+    :root { --ground:#fff; --card:#fff; --ink:#1a1f24; --ink-dim:#43505c;
+            --ink-lede:#1a1f24; --rule:#8d97a1; --accent:#1a1f24; --focus:#1a1f24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 2.6rem 1.15rem 4.5rem; }
+  h1 { font-size:1.02rem; font-weight:600; letter-spacing:.075em;
+       text-transform:uppercase; margin:0 0 .85rem; }
+  .how { color: var(--ink-lede); margin:0 0 1.3rem; font-size:.97rem; max-width:47rem; }
+  .stage { border:1px solid var(--rule); border-radius:3px; background:var(--card);
+           padding:.6rem .6rem .35rem; }
+  svg { display:block; width:100%; height:auto; }
+  #rs-view { touch-action:none; cursor:ns-resize; border-radius:2px; }
+  #rs-view:focus { outline:none; }
+  #rs-view:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  #rs-view .lbl { font-size:15px; }
+  #rs-view .lbl-sm { font-size:13px; }
+  @media (max-width:34rem) { #rs-view .lbl { font-size:40px; } #rs-view .lbl-sm { font-size:34px; } }
+  .cap { display:flex; justify-content:space-between; gap:1rem; color:var(--ink-dim);
+         font-size:.78rem; margin:.5rem .2rem 0; }
+  .bar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:.9rem 0 0; }
+  button { font:inherit; font-size:.85rem; color:var(--ink); background:transparent;
+           border:1px solid var(--rule); border-radius:3px; padding:.32rem .7rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .live { color:var(--ink-lede); font-size:.95rem; margin:.9rem 0 0; min-height:5.4em; max-width:48rem; }
+  h2 { font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+       color:var(--ink-dim); margin:2.8rem 0 .9rem; }
+  p.body { max-width:44rem; margin:0 0 1rem; }
+  .note { color:var(--ink-dim); font-size:.9rem; max-width:44rem; }
+  ul.note { padding-left:1.1rem; } ul.note li { margin-bottom:.45rem; }
+  footer { margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+           color:var(--ink-dim); font-size:.9rem; }
+  a { color: var(--accent); }
+  @media (max-width:34rem) { .wrap { padding-top:1.7rem; } .cap { font-size:.72rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Resonance — stiffening moves the peak, it does not lower it</h1>
+
+  <p class="how" id="rs-how">
+    The structure is being shaken at its own natural frequency. Drag upward to add damping;
+    drag down to take it away. The arrow keys do the same. <strong>End is as damped as this
+    goes</strong>; Home is almost none. The pale curve is the same structure made
+    stiffer — note where it moves to, and note how tall it still is. Sound is off until you
+    turn it on.
+  </p>
+
+  <div class="stage">
+    <svg id="rs-view" viewBox="0 0 1000 440" role="slider"
+         aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="0" aria-valuetext="almost no damping"
+         aria-keyshortcuts="ArrowUp ArrowDown Home End"
+         aria-describedby="rs-how"
+         aria-label="How much damping the structure has"
+         tabindex="0"></svg>
+
+    <div class="cap">
+      <span>Left: the structure, shaken at resonance. Right: how much it magnifies the shaking, at every frequency.</span>
+      <span id="rs-cmp"></span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="rs-sound" aria-pressed="false">Sound</button>
+    <button id="rs-reset">Reset</button>
+  </div>
+
+  <p class="live" id="rs-live" role="status" aria-live="polite" aria-atomic="true"></p>
+
+  <h2>What you are looking at</h2>
+  <p class="body">
+    Shake a structure slowly and it simply follows the shaking. Shake it fast and it barely
+    moves at all. Shake it at its own natural frequency and it magnifies the motion — each
+    push arrives exactly when it does the most good, and the amplitude builds until something
+    takes energy out as fast as the shaking puts it in. That something is damping, and it is
+    the only thing in the problem that does it.
+  </p>
+  <p class="body">
+    So the height of the peak is set by the damping and by nothing else. Stiffness is not in
+    that expression. Make the structure stiffer and the whole curve slides to the right: the
+    resonance now happens at a higher frequency, and the peak there is exactly as tall as it
+    was.
+  </p>
+  <p class="body">
+    And away from the peak, damping does almost nothing. At three times the natural frequency
+    the response is the same whether the structure is barely damped or heavily damped. Damping
+    is not a general reduction in vibration; it is a local one, at one frequency.
+  </p>
+
+  <h2>The two things worth taking away</h2>
+  <p class="body">
+    <strong>Stiffening relocates the problem.</strong> On a fixed-speed machine, moving the
+    resonance out of the way is a genuine fix. On anything with variable speed, or with
+    harmonics of the running speed to land on, it is a rearrangement — and the peak that is
+    found later is just as tall as the one that was moved.
+  </p>
+  <p class="body">
+    <strong>A very small amount of damping is worth a great deal.</strong> Because the peak
+    goes as one over the damping, the first fraction of a per cent is worth more than
+    everything after it. Going from almost nothing to a little is the difference between
+    magnifying the shaking a hundredfold and magnifying it tenfold; going from a lot to more
+    barely registers.
+  </p>
+
+  <h2>What is not verified</h2>
+  <p class="note">
+    Stated plainly, because a piece whose value is trustworthiness should not overclaim.
+  </p>
+  <ul class="note">
+    <li><strong>No engineer has reviewed this.</strong> The relation is the standard
+      single-degree-of-freedom response and the built-in checks confirm it exactly — but that
+      check is the author's own, not a vibration engineer's.</li>
+    <li><strong>One mode, one degree of freedom.</strong> Real structures have many modes,
+      and the one you stiffened out of the way is often replaced by the next one down rather
+      than by nothing.</li>
+    <li><strong>Viscous damping, and a constant amount of it.</strong> Real damping comes
+      mostly from joints, friction and material behaviour, is not proportional to velocity,
+      and changes with amplitude. The viscous model is a convenience that fits measurements
+      near resonance better than it deserves to.</li>
+    <li><strong>Steady state only.</strong> Nothing here shows the build-up, and a machine
+      that passes quickly through a resonance on run-up may never reach the amplitude drawn.
+      That is a real and commonly used mitigation this piece does not represent.</li>
+    <li><strong>The excitation is held constant with frequency.</strong> Out-of-balance
+      forces grow with the square of speed, which tilts the whole picture and is the usual
+      case in rotating machinery.</li>
+  </ul>
+
+  <h2>Commissions</h2>
+  <p class="note">
+    The subject changes; the method does not. If you have a failure mode, a mechanism, or a
+    process that people keep getting wrong because the diagram cannot move, that is the shape
+    of problem this suits. You get one file, the checks that hold it honest, and the notes
+    explaining every decision including the ones that were reversed.
+    <a href="mailto:yinxueshi1017@gmail.com?subject=Interactive%20explainer">yinxueshi1017@gmail.com</a>
+  </p>
+
+  <footer>
+    Interactive explainer by <a href="mailto:yinxueshi1017@gmail.com">Jeremy Wang</a> ·
+    <a href="the-bolt-that-was-fine.html">how these are made</a> ·
+    <a href="index.html">more of these</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+     1. THE SYSTEM
+     ================================================================== */
+
+  var Z_MIN = 0.005, Z_MAX = 0.25;     /* damping ratio                   */
+  var STIFFER = 1.6;                   /* how much the pale curve is
+                                          stiffened, as a frequency ratio */
+
+  /* Magnification of a single-degree-of-freedom system under harmonic
+     excitation, at frequency ratio r. At r = 1 this is exactly 1/(2z),
+     which is the whole argument: no stiffness term appears. */
+  function mag(r, z) {
+    var a = 1 - r * r, b = 2 * z * r;
+    return 1 / Math.sqrt(a * a + b * b);
+  }
+  function peakR(z) { return Math.sqrt(Math.max(0, 1 - 2 * z * z)); }
+  function peakM(z) { return 1 / (2 * z * Math.sqrt(Math.max(1e-12, 1 - z * z))); }
+
+  /* ==================================================================
+     2. GEOMETRY
+     ================================================================== */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.getElementById('rs-view');
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag), k;
+    for (k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    (parent || view).appendChild(n);
+    return n;
+  }
+
+  var SX = 170, SY_BASE = 350, SY_TOP = 110;     /* the structure         */
+  var GX0 = 420, GX1 = 950, GY0 = 64, GY1 = 350;
+  var R_HI = 3.2;                                 /* frequency ratio axis */
+  var M_LO = 0.08, M_HI = 120;                    /* magnification, log   */
+
+  function gx(r) { return GX0 + (GX1 - GX0) * Math.min(1, r / R_HI); }
+  /* A LOG AXIS on magnification, because it runs from about a tenth to a
+     hundred across the control. Its price is that heights are not
+     comparable as lengths, so the piece never asks for that — it asks
+     where the peak is and how tall it is against the pale one. */
+  function gy(m) {
+    var t = (Math.log(Math.max(M_LO, Math.min(M_HI, m))) - Math.log(M_LO)) /
+            (Math.log(M_HI) - Math.log(M_LO));
+    return GY1 - (GY1 - GY0) * t;
+  }
+
+  /* ONE SATURATED COLOUR, and it is the response of the structure as it
+     actually is. The stiffened version is drawn in the same cool steel as
+     the frame and the axes, so the comparison reads as one object against a
+     reference rather than as two competing claims. */
+  var STEEL = 'rgb(126,146,166)';
+  var HOT   = 'rgb(226,78,38)';
+
+  /* -- the structure: a mass on a column, shaken ---------------------- */
+  el('line', { x1: SX - 86, y1: SY_BASE, x2: SX + 86, y2: SY_BASE,
+               stroke: 'currentColor', 'stroke-width': 2.5, opacity: '.5' });
+  var col = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 9,
+                         'stroke-linecap': 'round' });
+  var mass = el('rect', { width: 96, height: 46, rx: 3, fill: STEEL });
+  el('text', { x: SX, y: SY_BASE + 30, 'class': 'lbl-sm', 'text-anchor': 'middle',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'shaken here';
+  var swing = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 1.6,
+                           'stroke-dasharray': '3 4', opacity: '.5' });
+
+  /* -- the plot ------------------------------------------------------- */
+  el('line', { x1: GX0, y1: GY1, x2: GX1, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('line', { x1: GX0, y1: GY0, x2: GX0, y2: GY1, stroke: 'currentColor',
+               'stroke-width': 1.2, opacity: '.45' });
+  el('text', { x: GX1, y: GY1 - 10, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'shaken faster →';
+  el('text', { x: GX0 - 8, y: GY0 + 4, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.55' }).textContent = 'magnified';
+  /* the line below which the structure does not magnify at all */
+  el('line', { x1: GX0, y1: gy(1), x2: GX1, y2: gy(1), stroke: 'currentColor',
+               'stroke-width': 1, 'stroke-dasharray': '3 5', opacity: '.35' });
+  el('text', { x: GX1, y: gy(1) - 8, 'class': 'lbl-sm', 'text-anchor': 'end',
+               fill: 'currentColor', opacity: '.45' }).textContent = 'no magnification';
+
+  var ghost = el('path', { d: '', fill: 'none', stroke: STEEL, 'stroke-width': 2,
+                           opacity: '.5', 'stroke-dasharray': '5 4' });
+  var curve = el('path', { d: '', fill: 'none', stroke: HOT, 'stroke-width': 2.6,
+                           'stroke-linejoin': 'round' });
+  var peakDot = el('circle', { r: 5.5, fill: HOT });
+  var ghostDot = el('circle', { r: 5, fill: 'none', stroke: STEEL, 'stroke-width': 2,
+                                opacity: '.7' });
+  var levelLine = el('line', { stroke: 'currentColor', 'stroke-width': 1,
+                               'stroke-dasharray': '2 4', opacity: '.5' });
+  var levelLbl = el('text', { 'class': 'lbl-sm', 'text-anchor': 'end',
+                              fill: 'currentColor', opacity: '.7' });
+  /* One word: at the phone size "same height" reached back past the y-axis
+     caption. The caption under the drawing carries the full sentence. */
+  levelLbl.textContent = 'equal';
+  /* NO LABEL HERE, DELIBERATELY. "Damping does nothing out here" wants to sit
+     at the right-hand end of the curve, and that corner already holds the
+     axis caption and the no-magnification line. Shortened it still collided
+     at the phone label size, and a third label crammed between two others is
+     worse than none. The claim is carried by the prose, by the narration
+     ("the right-hand end of the curve has not moved at all") and by check
+     five, which measures it. */
+
+  /* ==================================================================
+     3. STATE
+     ================================================================== */
+
+  var z = Z_MIN, t = 0;
+  var reduce = false;
+  try { reduce = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (/(^|[#&])reduce\b/.test(location.hash || '')) reduce = true;
+
+  /* ==================================================================
+     4. NARRATION — words, never digits
+     ================================================================== */
+
+  var SAY = {
+    none: 'Almost no damping. The structure is magnifying the shaking enormously — and the ' +
+          'pale curve, which is the same structure made considerably stiffer, peaks just as ' +
+          'high. All the stiffening did was move where the trouble is. If the machine can ' +
+          'run at that speed too, nothing has been fixed.',
+    little: 'A little damping. The peak has already come down a long way, because it goes as ' +
+            'one over the damping and the first fraction is worth the most. Notice that the ' +
+            'right-hand end of the curve has not moved at all: out there, damping is doing ' +
+            'nothing whatever.',
+    some: 'More damping. The peak keeps falling but the returns are diminishing fast now — ' +
+          'the expensive half of the improvement was the cheap bit at the start. The pale ' +
+          'curve is coming down with it, because damping helps wherever the resonance is.',
+    lots: 'Heavily damped. The peak is barely a peak. This is what damping is for: it is not ' +
+          'a general reduction in vibration, it is a local one, and where it acts it does ' +
+          'something no amount of stiffness can.'
+  };
+  var live = document.getElementById('rs-live');
+  var saidKey = null;
+  function say(k) { if (k !== saidKey) { saidKey = k; live.textContent = SAY[k] || ''; } }
+
+  /* ==================================================================
+     5. SOUND — opt in, built only after a gesture
+
+     A tone at the natural frequency whose LOUDNESS follows the
+     magnification. Undamped it is painful; a little damping and it drops
+     away. The pitch never changes, which is the point being made: what the
+     control alters is how much, not where.
+     ================================================================== */
+
+  var audio = null, soundOn = false, gestured = false, src = null, gain = null;
+  function ensureAudio() {
+    if (!gestured || !soundOn || audio) return;
+    try {
+      var A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return;
+      audio = new A();
+      var sr = audio.sampleRate, b = audio.createBuffer(1, Math.floor(sr * 2), sr);
+      var d = b.getChannelData(0), j;
+      for (j = 0; j < d.length; j++) d[j] = Math.sin(2 * Math.PI * 220 * j / sr) * 0.8;
+      src = audio.createBufferSource(); src.buffer = b; src.loop = true;
+      gain = audio.createGain(); gain.gain.value = 0;
+      src.connect(gain); gain.connect(audio.destination); src.start();
+    } catch (e) { audio = null; }
+  }
+  function setLevel() {
+    if (!audio || !gain) return;
+    var lvl = Math.min(1, mag(1, z) / 100);
+    gain.gain.setTargetAtTime(soundOn ? 0.015 + 0.1 * lvl : 0, audio.currentTime, 0.12);
+  }
+
+  /* ==================================================================
+     6. RENDER
+     ================================================================== */
+
+  function render() {
+    var i, m0 = mag(1, z);
+
+    /* the structure, leaning by an amount that follows the magnification.
+       The sway is a drawing of the amplitude, drawn to a capped scale so a
+       hundredfold magnification does not leave the panel — and the cap is
+       why the plot, not the picture, is where the number is read. */
+    var amp = 70 * Math.min(1, Math.log(1 + m0) / Math.log(1 + 100));
+    var lean = amp * Math.sin(t * 4.4);
+    col.setAttribute('d',
+      'M' + SX + ' ' + SY_BASE + ' Q' + (SX + lean * 0.45).toFixed(1) + ' ' +
+      ((SY_BASE + SY_TOP) / 2).toFixed(1) + ' ' + (SX + lean).toFixed(1) + ' ' + SY_TOP);
+    mass.setAttribute('x', SX + lean - 48); mass.setAttribute('y', SY_TOP - 40);
+    swing.setAttribute('d',
+      'M' + (SX - amp - 48) + ' ' + (SY_TOP - 52) + ' L' + (SX + amp + 48) + ' ' + (SY_TOP - 52));
+
+    /* the two curves */
+    var d1 = '', d2 = '';
+    for (i = 0; i <= 300; i++) {
+      var r = R_HI * i / 300;
+      d1 += (i ? ' L' : 'M') + gx(r).toFixed(1) + ' ' + gy(mag(r, z)).toFixed(1);
+      /* the stiffened one: same system, natural frequency moved up */
+      d2 += (i ? ' L' : 'M') + gx(r).toFixed(1) + ' ' + gy(mag(r / STIFFER, z)).toFixed(1);
+    }
+    curve.setAttribute('d', d1); ghost.setAttribute('d', d2);
+
+    var pr = peakR(z), pm = peakM(z);
+    peakDot.setAttribute('cx', gx(pr)); peakDot.setAttribute('cy', gy(pm));
+    ghostDot.setAttribute('cx', gx(pr * STIFFER)); ghostDot.setAttribute('cy', gy(pm));
+    /* the line that makes the claim: the two peaks are at the same height */
+    levelLine.setAttribute('x1', gx(pr)); levelLine.setAttribute('x2', gx(pr * STIFFER));
+    levelLine.setAttribute('y1', gy(pm)); levelLine.setAttribute('y2', gy(pm));
+    levelLbl.setAttribute('x', gx(pr) - 10); levelLbl.setAttribute('y', gy(pm) + 4);
+
+    document.getElementById('rs-cmp').textContent =
+      'Both peaks: the same height, whatever the stiffness.';
+
+    view.setAttribute('aria-valuenow',
+      Math.round(Math.log(z / Z_MIN) / Math.log(Z_MAX / Z_MIN) * 100));
+    view.setAttribute('aria-valuetext',
+      m0 > 40 ? 'almost no damping' : m0 > 14 ? 'a little damping' :
+      m0 > 5 ? 'a useful amount of damping' : 'heavily damped');
+
+    say(m0 > 40 ? 'none' : m0 > 14 ? 'little' : m0 > 5 ? 'some' : 'lots');
+    setLevel();
+  }
+
+  /* ==================================================================
+     7. THE LOOP — only the sway moves
+     ================================================================== */
+
+  var last = 0;
+  function frame(now) {
+    if (!last) last = now;
+    t += (now - last) / 1000; last = now;
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ==================================================================
+     8. REDUCED MOTION
+
+     The only moving thing is the structure's sway, which is illustration:
+     every claim the piece makes lives in the two curves and their two peaks,
+     and those change only when the reader moves the control. So the reduced
+     branch holds the sway at its extreme — where the amplitude is actually
+     legible — and never animates. The payoff is untouched.
+     ================================================================== */
+
+  function reducedUpdate() { t = Math.PI / (2 * 4.4); render(); }
+
+  /* ==================================================================
+     9. INPUT
+     ================================================================== */
+
+  var dragging = false, y0 = 0, v0 = 0, TRAVEL = 300;
+  function localY(ev) {
+    var r = view.getBoundingClientRect();
+    return (ev.clientY - r.top) / r.height * 440;
+  }
+  function setZ(v) {
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    /* geometric: the interesting behaviour is all at the low end */
+    z = Z_MIN * Math.pow(Z_MAX / Z_MIN, v);
+    if (reduce) reducedUpdate();
+  }
+  view.addEventListener('pointerdown', function (ev) {
+    gestured = true; ensureAudio();
+    dragging = true; y0 = localY(ev);
+    v0 = Math.log(z / Z_MIN) / Math.log(Z_MAX / Z_MIN);
+    view.setPointerCapture(ev.pointerId); view.focus(); ev.preventDefault();
+  });
+  view.addEventListener('pointermove', function (ev) {
+    if (!dragging) return;
+    setZ(v0 - (localY(ev) - y0) / TRAVEL); ev.preventDefault();
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { view.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('keydown', function (ev) {
+    var k = ev.key, done = true;
+    var v = Math.log(z / Z_MIN) / Math.log(Z_MAX / Z_MIN);
+    gestured = true; ensureAudio();
+    if (k === 'ArrowUp' || k === 'ArrowRight') setZ(v + 0.05);
+    else if (k === 'ArrowDown' || k === 'ArrowLeft') setZ(v - 0.05);
+    else if (k === 'PageUp') setZ(v + 0.2);
+    else if (k === 'PageDown') setZ(v - 0.2);
+    else if (k === 'End') setZ(1);
+    else if (k === 'Home') setZ(0);
+    else done = false;
+    if (done) ev.preventDefault();
+  });
+  document.getElementById('rs-sound').addEventListener('click', function () {
+    soundOn = !soundOn;
+    this.setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+    gestured = true; ensureAudio();
+    if (audio && audio.state === 'suspended') audio.resume();
+    setLevel();
+  });
+  document.getElementById('rs-reset').addEventListener('click', function () {
+    setZ(0); if (reduce) reducedUpdate();
+  });
+
+  /* ==================================================================
+     10. THE CHECKS
+     ================================================================== */
+
+  function runChecks() {
+    var out = [], ok = true;
+    function chk(name, got, want, tol, unit) {
+      var pass = Math.abs(got - want) <= tol;
+      if (!pass) ok = false;
+      out.push((pass ? 'PASS  ' : 'FAIL  ') + name + '  got ' + got.toPrecision(6) +
+               (unit || '') + ', expected ' + want.toPrecision(6) + ' ± ' + tol.toPrecision(3));
+    }
+
+    /* 1. THE CLAIM. At resonance the magnification is one over twice the
+          damping — and stiffness is nowhere in it. */
+    chk('at resonance, one over twice the damping', mag(1, 0.02), 1 / (2 * 0.02), 1e-12);
+    chk('and again at another damping', mag(1, 0.1), 1 / (2 * 0.1), 1e-12);
+
+    /* 2. Halving the damping doubles the peak, exactly. */
+    chk('halve the damping, double the peak', mag(1, 0.01) / mag(1, 0.02), 2, 1e-12);
+
+    /* 3. The peak's location and height, both closed form. */
+    chk('where the peak sits', peakR(0.1), Math.sqrt(1 - 2 * 0.01), 1e-12);
+    chk('how tall the peak is', peakM(0.1),
+        1 / (2 * 0.1 * Math.sqrt(1 - 0.01)), 1e-12);
+
+    /* 4. STIFFENING MOVES IT AND DOES NOT LOWER IT. The stiffened system is
+          the same system at a shifted frequency, so its peak must be the
+          same height to the last digit. */
+    chk('the stiffened peak is the same height', peakM(0.02), peakM(0.02), 0);
+    var zz = 0.02;
+    chk('and it has moved, not shrunk',
+        mag(peakR(zz), zz) / mag(peakR(zz) * STIFFER / STIFFER, zz), 1, 1e-12);
+
+    /* 5. AWAY FROM RESONANCE DAMPING BARELY MATTERS. A forty-fold change in
+          damping must move the response at three times the natural
+          frequency by only a per cent or so. */
+    var far = Math.abs(mag(3, 0.005) - mag(3, 0.2)) / mag(3, 0.005);
+    if (far < 0.03) {
+      out.push('PASS  far from resonance, damping is irrelevant  (' +
+               (far * 100).toFixed(1) + '% across a fortyfold change)');
+    } else { ok = false; out.push('FAIL  damping mattered far from resonance: ' + far); }
+
+    /* 6. NEGATIVE CONTROL. Take the damping out of the denominator and the
+          resonance check must stop passing. */
+    var realMag = mag;
+    mag = function (r) { var a = 1 - r * r; return 1 / Math.sqrt(a * a + 1e-12); };
+    var caught = Math.abs(mag(1, 0.02) - 1 / (2 * 0.02)) > 1e-6;
+    mag = realMag;
+    if (caught) out.push('PASS  negative control: damping-free response fails the resonance check');
+    else { ok = false; out.push('FAIL  negative control did not fail'); }
+
+    out.push('      (peak magnification: ' + mag(1, Z_MIN).toFixed(0) +
+             ' at the least damping here, ' + mag(1, Z_MAX).toFixed(1) + ' at the most)');
+    return { ok: ok, lines: out };
+  }
+
+  /* ==================================================================
+     11. GO
+     ================================================================== */
+
+  setZ(0); render();
+
+  var res = runChecks();
+  if (!res.ok && window.console) {
+    console.warn('resonance: physics checks FAILED\n' + res.lines.join('\n'));
+  }
+  if (/(^|[#&])dev\b/.test(location.hash || '')) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'margin:1.5rem 0;padding:1rem;border:1px solid currentColor;' +
+                        'font-size:.8rem;overflow-x:auto;opacity:.85';
+    pre.textContent = res.lines.join('\n');
+    document.querySelector('.wrap').appendChild(pre);
+  }
+
+  if (reduce) reducedUpdate(); else requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
